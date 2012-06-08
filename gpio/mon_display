@@ -1,0 +1,11 @@
+#!/bin/sh
+while true ; do
+  if ! cmp -s displayfile .displayfile ; then  
+    cp displayfile .displayfile
+    clrdisplay
+    writedisplay `head -1 .displayfile`
+    moveto 1 0
+    writedisplay `tail -n +2 .displayfile | head -1`
+  fi
+  sleep 1
+done

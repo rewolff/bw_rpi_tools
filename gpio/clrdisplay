@@ -1,0 +1,2 @@
+#!/bin/sh
+send_spi 82 10 0 

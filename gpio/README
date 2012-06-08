@@ -1,0 +1,70 @@
+
+The gpio_list program allows you to list the functions of all the
+IOs on the Raspberry Pi. 
+
+See the Broadcom BCM2835 Datasheet on page 102 what each ALT function
+does. 
+
+On the Raspberry Pi:
+
+GPIO0 
+GPIO1       connected as SDA/SCL to P1-03 and P1-05. 
+
+GPIO7-11  are connected as the SPI bus to P1-19, P1-21, P1-23, P1-24 and
+          P1-26.
+
+GPIO14
+GPIO15  are connected as RXD and TXD  to P1-08 and P1-10. 
+
+Furtermore 
+GPIO18, GPIO23, GPIO24, GPIO25, GPIO4, GPIO17, GPIO21, GPIO22
+are also connected to the P1 connector. 
+
+It would be wise not to touch any other GPIO pins, as those might 
+be involved in keeping the Raspberry Pi working. 
+
+At the moment it is difficult to find information about what they would do
+as the schematics hasn't been released yet. 
+
+
+You can control the separate IOs with 
+gpio_setfunc (configure the function of the pin). Chose from
+   INP, OUT, ALT0, ALT1, ALT2, ALT3, ALT4, ALT5. 
+gpio_set if configured as an output, make the output high. 
+gpio_clr if configured as an output, make the output low. 
+gpio_get get the level of the pin. 
+
+Example: 
+
+raspberrypi:~/gpio> sudo gpio_list
+   0     INP  INP  INP  INP  INP  INP  OUT  INP  INP  INP 
+  10     INP  INP  INP  INP ALT0 ALT0  OUT  INP  INP  INP 
+  20     INP  INP  INP  INP  INP  INP  INP  INP  INP  INP 
+  30     INP  INP  INP  INP  INP  INP  INP  INP  INP  INP 
+  40    ALT0  INP  INP  INP  INP ALT0  INP  INP ALT3 ALT3 
+  50    ALT3 ALT3 ALT3 ALT3  INP 
+raspberrypi:~/gpio> sudo gpio_setfunc 0 OUT
+raspberrypi:~/gpio> sudo gpio_setfunc 1 OUT
+raspberrypi:~/gpio> sudo gpio_set 1
+raspberrypi:~/gpio> sudo gpio_clr 1
+raspberrypi:~/gpio> sudo gpio_set 1
+raspberrypi:~/gpio> sudo gpio_clr 1
+raspberrypi:~/gpio> sudo gpio_setfunc 0 ALT0
+raspberrypi:~/gpio> sudo gpio_setfunc 1 ALT0
+
+
+First we list the current values for configuration of the GPIO pins. 
+Then we make GPIO 0 and 1 outputs and toggle gpio 1 a couple of times. 
+You should see the SCL line toggle if you have something connected with
+which to observe that. 
+
+Next we configure those two outputs for ALT0 function: the I2C module
+(BSC in Broadcom language). 
+
+
+The send_spi program allows you to send data on SPI bus 0. It will have
+to be modified a little for SPI bus 1. I don't want to clutter the 
+commandline with the busnumber. Suggestions?
+
+
+

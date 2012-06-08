@@ -1,0 +1,4 @@
+#!/bin/sh
+addr=$1
+send_i2c $addr 1
+read_i2c 10
