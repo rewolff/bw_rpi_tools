@@ -157,7 +157,7 @@ static void do_ident (int fd)
   spi_txrx (fd, 0x20, buf);
   for (i=2;i<0x20;i++) {
     if (!buf[i]) break;
-    putc (buf[i]);
+    putchar (buf[i]);
   }
 }
 
@@ -306,7 +306,7 @@ int main(int argc, char *argv[])
   // printf("max speed: %d Hz (%d KHz)\n", speed, speed/1000);
 
   if (ident) 
-    do_ident ();
+    do_ident (fd);
 
 
   if (write8mode || write16mode) {
