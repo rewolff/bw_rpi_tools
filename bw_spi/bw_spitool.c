@@ -159,6 +159,7 @@ static void do_ident (int fd)
     if (!buf[i]) break;
     putchar (buf[i]);
   }
+  putchar ('\n');
 }
 
 static void print_usage(const char *prog)
