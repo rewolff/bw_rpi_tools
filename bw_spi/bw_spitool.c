@@ -48,7 +48,7 @@ static int addr;
 
 static int reg = -1;
 static int val = -1;
-static int write8mode, write16mode;
+static int write8mode, write16mode, ident;
 
 static void pabort(const char *s)
 {
@@ -147,6 +147,19 @@ static void set_reg_value16 (int fd, int reg, int val)
 }
 
 
+static void do_ident (int fd)
+{
+  char buf[0x20];
+  int i;
+
+  buf [0] = addr | 1;
+  buf [1] = 1;
+  spi_txrx (fd, 0x20, buf);
+  for (i=2;i<0x20;i++) {
+    if (!buf[i]) break;
+    putc (buf[i]);
+  }
+}
 
 static void print_usage(const char *prog)
 {
@@ -171,12 +184,13 @@ static const struct option lopts[] = {
   { "speed",   1, 0, 's' },
   { "delay",   1, 0, 'd' },
 
-  // text display options. 
+
   { "reg",       1, 0, 'r' },
   { "val",       1, 0, 'v' },
   { "addr",      1, 0, 'a' },
   { "write8",    0, 0, 'w' },
   { "write16",   0, 0, 'W' },
+  { "identify",  0, 0, 'i' },
 
   { NULL, 0, 0, 0 },
 };
@@ -188,7 +202,7 @@ static int parse_opts(int argc, char *argv[])
   while (1) {
     int c;
 
-    c = getopt_long(argc, argv, "D:s:d:r:v:a:wW", lopts, NULL);
+    c = getopt_long(argc, argv, "D:s:d:r:v:a:wWi", lopts, NULL);
 
     if (c == -1)
       break;
@@ -218,6 +232,9 @@ static int parse_opts(int argc, char *argv[])
       break;
     case 'W':
       write16mode = 1;
+      break;
+    case 'i':
+      ident = 1;
       break;
 
     default:
@@ -288,6 +305,10 @@ int main(int argc, char *argv[])
   // printf("bits per word: %d\n", bits);
   // printf("max speed: %d Hz (%d KHz)\n", speed, speed/1000);
 
+  if (ident) 
+    do_ident ();
+
+
   if (write8mode || write16mode) {
     for (i=nonoptions;i<argc;i++) {
       if (sscanf (argv[i], "%x:%x", &reg, &val) == 2) {
@@ -303,6 +324,7 @@ int main(int argc, char *argv[])
       }
     }
   }
+
 
   if (reg != -1) 
     set_reg_value8 (fd, reg, val); 
