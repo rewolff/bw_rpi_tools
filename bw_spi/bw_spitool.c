@@ -115,7 +115,7 @@ static void send_text (int fd, char *str)
   int l;
   l = strlen (str);
   buf = malloc (l + 5); 
-  buf[0] = 0x82;
+  buf[0] = addr;
   buf[1] = 0; 
   strcpy (buf+2, str); 
   spi_txrx (fd, l+2, buf);
@@ -127,7 +127,7 @@ static void set_reg_value8 (int fd, int reg, int val)
 {
   char buf[5]; 
 
-  buf[0] = 0x82;
+  buf[0] = addr;
   buf[1] = reg;
   buf[2] = val;
   spi_txrx (fd, 3, buf);
@@ -139,7 +139,7 @@ static void set_reg_value16 (int fd, int reg, int val)
 {
   char buf[5]; 
 
-  buf[0] = 0x82;
+  buf[0] = addr;
   buf[1] = reg;
   buf[2] = val;
   buf[3] = val >> 8;
