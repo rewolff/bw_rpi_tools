@@ -48,7 +48,7 @@ static int addr;
 
 static int reg = -1;
 static int val = -1;
-
+static int write8mode, write16mode;
 
 static void pabort(const char *s)
 {
@@ -59,6 +59,7 @@ static void pabort(const char *s)
 
 static void spi_txrx (int fd, int len, char *buf)
 {
+  int ret;
   struct spi_ioc_transfer tr = {
     .delay_usecs = delay,
     .speed_hz = speed,
@@ -107,6 +108,7 @@ static void transfer(int fd, int len, char *buf)
 #endif
 
 
+#if 0
 static void send_text (int fd, char *str) 
 {
   char *buf; 
@@ -119,7 +121,7 @@ static void send_text (int fd, char *str)
   spi_txrx (fd, l+2, buf);
   free (buf);
 }
-
+#endif
 
 static void set_reg_value8 (int fd, int reg, int val)
 {
@@ -128,7 +130,20 @@ static void set_reg_value8 (int fd, int reg, int val)
   buf[0] = 0x82;
   buf[1] = reg;
   buf[2] = val;
-  transfer (fd, 3, buf);
+  spi_txrx (fd, 3, buf);
+}
+
+
+
+static void set_reg_value16 (int fd, int reg, int val)
+{
+  char buf[5]; 
+
+  buf[0] = 0x82;
+  buf[1] = reg;
+  buf[2] = val;
+  buf[3] = val >> 8;
+  spi_txrx (fd, 4, buf);
 }
 
 
@@ -219,7 +234,7 @@ int main(int argc, char *argv[])
   int ret = 0;
   int fd;
   int nonoptions;
-  char buf[0x100];
+  //char buf[0x100];
   int i;
 
   nonoptions = parse_opts(argc, argv);
@@ -280,7 +295,7 @@ int main(int argc, char *argv[])
 	if (write8mode) 
 	  set_reg_value8 (fd, reg, val);
 	else 
-	  set_reg_value1`6 (fd, reg, val);
+	  set_reg_value16 (fd, reg, val);
 
       } else {
 	fprintf (stderr, "dont understand reg:val in: %s\n", argv[i]);
