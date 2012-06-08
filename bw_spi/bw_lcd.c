@@ -268,7 +268,7 @@ int main(int argc, char *argv[])
 
   if (contrast != -1) set_reg_value8 (fd, 0x12, contrast);
 
-  if (backlight != -1) set_reg_value8 (fd, 0x13, contrast);
+  if (backlight != -1) set_reg_value8 (fd, 0x13, backlight);
 
   if ((x != -1) && (y != -1)) {
     set_reg_value8 (fd, 0x11, (y << 5) | x);
