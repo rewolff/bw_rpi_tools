@@ -96,7 +96,7 @@ static void send_text (int fd, char *str)
   int l;
   l = strlen (str);
   buf = malloc (l + 5); 
-  buf[0] = 0x82;
+  buf[0] = addr;
   buf[1] = 0; 
   strcpy (buf+2, str); 
   transfer (fd, l+2, buf);
@@ -106,7 +106,7 @@ static void send_text (int fd, char *str)
 static void set_reg_value8 (int fd, int reg, int val)
 {
   char buf[5]; 
-  buf[0] = 0x82;
+  buf[0] = addr;
   buf[1] = reg;
   buf[2] = val;
   transfer (fd, 3, buf);
