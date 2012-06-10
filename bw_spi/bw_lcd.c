@@ -167,7 +167,7 @@ static int parse_opts(int argc, char *argv[])
 
     switch (c) {
     case 'D':
-      device = optarg;
+      device = strdup (optarg);
       break;
     case 's':
       speed = atoi(optarg);
