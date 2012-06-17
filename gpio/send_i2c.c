@@ -91,6 +91,15 @@ int main(int argc, char **argv)
   unsigned int v;
   int t;
 
+  if (argc < 2) {
+     if (strstr (argv[0], "read")) {
+        fprintf (stderr, "Usage: %s <numbytes>\n     (address is used from previouss write.)\n", argv[0]);
+	exit (1);
+     } else {
+        fprintf (stderr, "Usage: %s <address> <byte> ...\n", argv[0]);
+	exit (1);
+     }
+  }
   // Set up gpi pointer for direct register access
   setup_io();
 
