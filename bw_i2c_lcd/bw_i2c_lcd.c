@@ -34,6 +34,7 @@
 #include <sys/ioctl.h>
 #include <linux/types.h>
 #include <linux/spi/spidev.h>
+#include <linux/i2c-dev.h>
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
@@ -58,9 +59,9 @@ static void pabort(const char *s)
   abort();
 }
 
-void transfer (int fd, char *buf,  int len)
+void transfer (int fd, int len, char *buf)
 {
-   write (fd, buf, len);
+   write (fd, buf+1, len-1);
 }
 
 
@@ -70,7 +71,7 @@ static void send_text (int fd, char *str)
   int l;
   l = strlen (str);
   buf = malloc (l + 5); 
-  buf[0] = addr;
+  buf[0] = addr; 
   buf[1] = 0; 
   strcpy (buf+2, str); 
   transfer (fd, l+2, buf);
@@ -204,7 +205,7 @@ int main(int argc, char *argv[])
 
   // .xx.
   addr = addr >> 1;
-  if (ioctl(file, I2C_SLAVE, addr) < 0) 
+  if (ioctl(fd, I2C_SLAVE, addr) < 0) 
     pabort ("cant set slave addr");
 
   if (cls) set_reg_value8 (fd, 0x10, 0xaa);
