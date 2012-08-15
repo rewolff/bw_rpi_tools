@@ -355,6 +355,7 @@ void do_monitor_file (int fd, char *fname)
   int i;
   char *buf;
 
+  fprintf (stderr, "monitoring %s on fd %d.\n", fname, fd);
   while (1) {
     wait_for_file_changed (fname);
     for (i=0;i<4;i++) {
