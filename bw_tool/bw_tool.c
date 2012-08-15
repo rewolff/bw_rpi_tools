@@ -48,6 +48,7 @@ static uint32_t speed = 450000;
 static uint16_t delay = 2;
 static int addr = 0x82;
 static int text = 0;
+static char *monitor_file;
 
 static int reg = -1;
 static int val = -1;
@@ -80,6 +81,7 @@ static void spi_txrx (int fd, char *buf, int len)
 
 }
 
+
 static void i2c_txrx (int fd, char *buf, int len)
 {
    static int slave = -1;
@@ -89,7 +91,9 @@ static void i2c_txrx (int fd, char *buf, int len)
          pabort ("cant set slave addr");
       slave = buf[0];
    }
-   write (fd, buf+1, len-1);
+   if (write (fd, buf+1, len-1) != (len-1)) {
+     pabort ("cant write i2c");
+   }
 }
 
 
@@ -192,6 +196,7 @@ static const struct option lopts[] = {
   // Options for LCD
   { "text",      0, 0, 't' },
   { "cls",       0, 0, 'C' },
+  { "monitor",   1, 0, 'm' },
 
 
   { "i2c",       0, 0, 'I' },
@@ -206,7 +211,7 @@ static int parse_opts(int argc, char *argv[])
   while (1) {
     int c;
 
-    c = getopt_long(argc, argv, "D:s:d:r:v:a:wWitCI", lopts, NULL);
+    c = getopt_long(argc, argv, "D:s:d:r:v:a:wWitCmI", lopts, NULL);
 
     if (c == -1)
       break;
@@ -251,6 +256,10 @@ static int parse_opts(int argc, char *argv[])
 
     case 'C':
       cls = 1;
+      break;
+
+    case 'm':
+      monitor_file = strdup (optarg);
       break;
 
     default:
@@ -302,6 +311,59 @@ void setup_spi_mode (int fd)
   printf("bits per word: %d\n", bits);
   printf("max speed: %d Hz (%d KHz)\n", speed, speed/1000);
 }
+
+
+
+void wait_for_file_changed (char *fname)
+{
+  static time_t lastmtime = 0;
+  struct stat statb;
+
+  while (1) {
+    if (stat (fname, &statb) < 0) {
+      pabort (fname);
+    }
+
+    if (lastmtime != statb.st_mtime) {
+      lastmtime = statb.st_mtime;
+      return;
+    }
+    usleep (250000);
+  }
+}
+
+char *get_file_line (char *fname, int lno)
+{
+  static char buf[0x40], *p;
+  FILE *f;
+  int i;
+
+
+  f = fopen (fname, "r");
+  if (!f) pabort (fname);
+  for (i = 0;i<=lno;i++) {
+    buf [0] = 0;
+    p = fgets (buf, 0x3f, f);
+  }
+  return buf;
+}
+
+
+void do_monitor_file (int fd, char *fname)
+{
+  int i;
+  char *buf;
+
+  while (1) {
+    wait_for_file_changed (fname);
+    for (i=0;i<4;i++) {
+      set_reg_value8 (fd, 0x11, i<<5);
+      buf = get_file_line (fname, i);
+      send_text (fd, buf);
+    }
+  }
+}
+
 
 
 int main(int argc, char *argv[])
@@ -356,6 +418,9 @@ int main(int argc, char *argv[])
     }
     send_text (fd, buf);
   }
+
+  if (monitor_file) 
+    do_monitor_file (fd, monitor_file);
 
   close(fd);
 
