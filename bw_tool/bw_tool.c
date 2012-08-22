@@ -212,7 +212,7 @@ static int parse_opts(int argc, char *argv[])
   while (1) {
     int c;
 
-    c = getopt_long(argc, argv, "D:s:d:r:v:a:wWitCmI", lopts, NULL);
+    c = getopt_long(argc, argv, "D:s:d:r:v:a:wWitCm:I", lopts, NULL);
 
     if (c == -1)
       break;
@@ -326,6 +326,7 @@ void wait_for_file_changed (char *fname)
     }
 
     if (lastmtime != statb.st_mtime) {
+      printf ("fc: %x / %x\n", lastmtime, statb.st_mtime);
       lastmtime = statb.st_mtime;
       return;
     }
@@ -333,9 +334,10 @@ void wait_for_file_changed (char *fname)
   }
 }
 
+
 char *get_file_line (char *fname, int lno)
 {
-  static char buf[0x40], *p;
+  static char buf[0x50], *p;
   FILE *f;
   int i;
 
@@ -345,7 +347,10 @@ char *get_file_line (char *fname, int lno)
   for (i = 0;i<=lno;i++) {
     buf [0] = 0;
     p = fgets (buf, 0x3f, f);
+    if (!p) return p;
   }
+  close (f);
+  buf[strlen(buf)-1] = 0; // chop!
   return buf;
 }
 
@@ -354,14 +359,22 @@ void do_monitor_file (int fd, char *fname)
 {
   int i;
   char *buf;
+  char olddisplay[4][0x20];
 
   fprintf (stderr, "monitoring %s on fd %d.\n", fname, fd);
   while (1) {
     wait_for_file_changed (fname);
+    //set_reg_value8 (fd, 0x10, 0xaa);
     for (i=0;i<4;i++) {
-      set_reg_value8 (fd, 0x11, i<<5);
       buf = get_file_line (fname, i);
-      send_text (fd, buf);
+      if (!buf) break;
+      buf[20] = 0;
+      if (strcmp (buf, olddisplay[i])) { 
+        strcpy (olddisplay[i], buf);
+        set_reg_value8 (fd, 0x11, i<<5);
+        send_text (fd, buf);
+        usleep (50000);
+      }
     }
   }
 }
