@@ -349,7 +349,7 @@ char *get_file_line (char *fname, int lno)
     p = fgets (buf, 0x3f, f);
     if (!p) return p;
   }
-  close (f);
+  fclose (f);
   buf[strlen(buf)-1] = 0; // chop!
   return buf;
 }
