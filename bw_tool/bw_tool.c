@@ -39,10 +39,10 @@
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
 
-#define SPI_MODE 1
-#define I2C_MODE 2
-static const char *device = "/dev/spidev0.0";
+enum {SPI_MODE = 1, I2C_MODE } ; 
 static int mode = SPI_MODE;
+
+static const char *device = "/dev/spidev0.0";
 static uint8_t spi_mode;
 static uint8_t bits = 8;
 static uint32_t speed = 450000;
@@ -373,6 +373,7 @@ void do_monitor_file (int fd, char *fname)
     for (i=0;i<4;i++) {
       buf = get_file_line (fname, i);
       if (!buf) break;
+      while (strlen (buf) < 20) strcat (buf, "    ");
       buf[20] = 0;
       if (strcmp (buf, olddisplay[i])) { 
         strcpy (olddisplay[i], buf);
