@@ -331,7 +331,7 @@ void wait_for_file_changed (char *fname)
     }
 
     if (lastmtime != statb.st_mtime) {
-      printf ("fc: %x / %x\n", (int) lastmtime, (int) statb.st_mtime);
+      //printf ("fc: %x / %x\n", (int) lastmtime, (int) statb.st_mtime);
       lastmtime = statb.st_mtime;
       return;
     }
@@ -366,7 +366,7 @@ void do_monitor_file (int fd, char *fname)
   char *buf;
   char olddisplay[4][0x20];
 
-  fprintf (stderr, "monitoring %s on fd %d.\n", fname, fd);
+  //fprintf (stderr, "monitoring %s on fd %d.\n", fname, fd);
   while (1) {
     wait_for_file_changed (fname);
     //set_reg_value8 (fd, 0x10, 0xaa);
