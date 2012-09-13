@@ -61,7 +61,7 @@ static void pabort(const char *s)
 }
 
 
-static void spi_txrx (int fd, char *buf, int len)
+static void spi_txrx (int fd, char *buf, int tlen, int rlen)
 {
   int ret;
   struct spi_ioc_transfer tr = {
@@ -70,7 +70,8 @@ static void spi_txrx (int fd, char *buf, int len)
     .bits_per_word = bits,
   };
 
-  tr.len = len; 
+  if (rlen > tlen) tr.len = rlen; 
+  else             tr.len = tlen; 
   tr.tx_buf = (unsigned long) buf; 
   tr.rx_buf = (unsigned long) buf; 
   
@@ -80,7 +81,7 @@ static void spi_txrx (int fd, char *buf, int len)
 
 }
 
-static void i2c_txrx (int fd, char *buf, int len)
+static void i2c_txrx (int fd, char *buf, int tlen, int rlen)
 {
    static int slave = -1;
 
@@ -89,16 +90,18 @@ static void i2c_txrx (int fd, char *buf, int len)
          pabort ("cant set slave addr");
       slave = buf[0];
    }
-   write (fd, buf+1, len-1);
+   write (fd, buf+1, tlen-1);
+   if (rlen) read (fd, buf, rlen);
 }
 
 
-static void transfer(int fd, char *buf, int len)
+static void transfer(int fd, char *buf, int tlen, int rlen)
 {
+printf ("transferring %d.\n", mode);
   if (mode == SPI_MODE) 
-     spi_txrx (fd, buf, len);
+     spi_txrx (fd, buf, tlen, rlen);
   else
-     i2c_txrx (fd, buf, len);
+     i2c_txrx (fd, buf, tlen, rlen);
 }
 
 
@@ -112,7 +115,7 @@ static void send_text (int fd, char *str)
   buf[0] = addr;
   buf[1] = 0; 
   strcpy (buf+2, str); 
-  transfer (fd, buf, l+2);
+  transfer (fd, buf, l+2, 0);
   free (buf);
 }
 
@@ -124,7 +127,7 @@ static void set_reg_value8 (int fd, int reg, int val)
   buf[0] = addr;
   buf[1] = reg;
   buf[2] = val;
-  transfer (fd, buf, 3);
+  transfer (fd, buf, 3, 0);
 }
 
 
@@ -136,7 +139,7 @@ static void set_reg_value16 (int fd, int reg, int val)
   buf[1] = reg;
   buf[2] = val;
   buf[3] = val >> 8;
-  transfer (fd, buf, 4);
+  transfer (fd, buf, 4, 0);
 }
 
 
@@ -149,9 +152,10 @@ static void do_ident (int fd)
   buf [1] = 1;
 
   // XXX allow I2C version to ident too!
-  spi_txrx (fd, buf, 0x20);
+  //spi_txrx (fd, buf, 0x2,0x20);
+  transfer (fd, buf, 0x2,0x20);
 
-  for (i=2;i<0x20;i++) {
+  for (i=0;i<0x20;i++) {
     if (!buf[i]) break;
     putchar (buf[i]);
   }
@@ -268,6 +272,7 @@ void setup_spi_mode (int fd)
   /*
    * spi mode
    */
+printf ("setting spi mode. \n");
   ret = ioctl(fd, SPI_IOC_WR_MODE, &spi_mode);
   if (ret == -1)
     pabort("can't set spi mode");
@@ -318,6 +323,8 @@ int main(int argc, char *argv[])
     exit (1);
   }
 
+  fprintf (stderr, "dev = %s\n", device);
+  fprintf (stderr, "mode = %d\n", mode);
   fd = open(device, O_RDWR);
   if (fd < 0)
     pabort("can't open device");
