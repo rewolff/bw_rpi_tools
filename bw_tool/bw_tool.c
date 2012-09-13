@@ -282,7 +282,7 @@ void setup_spi_mode (int fd)
   /*
    * spi mode
    */
-printf ("setting spi mode. \n");
+  // printf ("setting spi mode. \n");
   ret = ioctl(fd, SPI_IOC_WR_MODE, &spi_mode);
   if (ret == -1)
     pabort("can't set spi mode");
@@ -313,9 +313,9 @@ printf ("setting spi mode. \n");
   if (ret == -1)
     pabort("can't get max speed hz");
 
-  printf("spi mode: %d\n", spi_mode);
-  printf("bits per word: %d\n", bits);
-  printf("max speed: %d Hz (%d KHz)\n", speed, speed/1000);
+  //printf("spi mode: %d\n", spi_mode);
+  //printf("bits per word: %d\n", bits);
+  //printf("max speed: %d Hz (%d KHz)\n", speed, speed/1000);
 }
 
 
@@ -400,8 +400,8 @@ int main(int argc, char *argv[])
     exit (1);
   }
 
-  fprintf (stderr, "dev = %s\n", device);
-  fprintf (stderr, "mode = %d\n", mode);
+  //fprintf (stderr, "dev = %s\n", device);
+  //fprintf (stderr, "mode = %d\n", mode);
   fd = open(device, O_RDWR);
   if (fd < 0)
     pabort("can't open device");
