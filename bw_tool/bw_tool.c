@@ -156,11 +156,9 @@ static void do_ident (int fd)
   buf [0] = addr | 1;
   buf [1] = 1;
 
-  // XXX allow I2C version to ident too!
-  //spi_txrx (fd, buf, 0x2,0x20);
   transfer (fd, buf, 0x2,0x20);
 
-  for (i=0;i<0x20;i++) {
+  for (i= (mode==I2C_MODE)?0:2 ;i<0x20;i++) {
     if (!buf[i]) break;
     putchar (buf[i]);
   }
