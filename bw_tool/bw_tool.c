@@ -90,14 +90,16 @@ static void i2c_txrx (int fd, char *buf, int tlen, int rlen)
 
    if (buf[0] != slave) {
       if (ioctl(fd, I2C_SLAVE, buf[0] >> 1) < 0) 
-         pabort ("cant set slave addr");
+         pabort ("can't set slave addr");
       slave = buf[0];
    }
    if (write (fd, buf+1, tlen-1) != (tlen-1)) {
-     pabort ("cant write i2c");
+     pabort ("can't write i2c");
    }
    //XXX: check return code. 
-   if (rlen) read (fd, buf, rlen);
+   if (rlen) 
+     if (read (fd, buf, rlen) != rlen) 
+        pabort ("can't read i2c");
 }
 
 
