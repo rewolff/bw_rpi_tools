@@ -285,6 +285,7 @@ static int parse_opts(int argc, char *argv[])
       device = "/dev/i2c-0";
       break;
     case 'S':
+      if (speed > 100000) speed = 100000;
       scan=1;
       break;  
     case 't':
