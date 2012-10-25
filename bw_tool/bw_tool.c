@@ -55,6 +55,7 @@ static int reg = -1;
 static int val = -1;
 static int cls = 0;
 static int write8mode, write16mode, ident;
+static int scan = 0;
 
 static void pabort(const char *s)
 {
@@ -167,6 +168,31 @@ static void do_ident (int fd)
   putchar ('\n');
 }
 
+char mkprintable (char ch)
+{
+  if (ch < ' ') return '.';
+  if (ch <= '~') return ch;
+  return '.';
+}
+
+static void do_scan (int fd)
+{
+  char buf[0x20];
+  int add;
+  int i;
+
+  for (add = 0;add < 255;add += 2) {
+    buf[0] = add | 1;
+    buf[1] = 1;
+    transfer (fd, buf, 0x2, 0x20);
+    printf ("%02x: ", add);
+    for (i=(mode==I2C_MODE)?0:2;i<0x20;i++) {
+      putchar (mkprintable (buf[i]));
+    }
+    printf ("\n");
+  }
+
+}
 
 static void print_usage(const char *prog)
 {
@@ -197,6 +223,7 @@ static const struct option lopts[] = {
   { "write8",    0, 0, 'w' },
   { "write16",   0, 0, 'W' },
   { "identify",  0, 0, 'i' },
+  { "scan",      0, 0, 'S' },
 
   // Options for LCD
   { "text",      0, 0, 't' },
@@ -223,7 +250,9 @@ static int parse_opts(int argc, char *argv[])
 
     switch (c) {
     case 'D':
-      device = optarg;
+      device = strdup (optarg);
+      if (strstr (device, "i2c")) mode=I2C_MODE;
+      else                        mode=SPI_MODE;
       break;
     case 's':
       speed = atoi(optarg);
@@ -255,7 +284,9 @@ static int parse_opts(int argc, char *argv[])
       mode=I2C_MODE;
       device = "/dev/i2c-0";
       break;
-  
+    case 'S':
+      scan=1;
+      break;  
     case 't':
       text = 1;
       break;
@@ -442,6 +473,9 @@ int main(int argc, char *argv[])
     }
     send_text (fd, buf);
   }
+
+  if (scan)
+    do_scan (fd);
 
   if (monitor_file) 
     do_monitor_file (fd, monitor_file);
