@@ -50,6 +50,7 @@ static uint16_t delay = 2;
 static int addr = 0x82;
 static int text = 0;
 static char *monitor_file;
+static int readmode = 0;
 
 static int reg = -1;
 static int val = -1;
@@ -136,6 +137,18 @@ static void set_reg_value8 (int fd, int reg, int val)
   buf[1] = reg;
   buf[2] = val;
   transfer (fd, buf, 3, 0);
+}
+
+
+static int get_reg_value8 (int fd, int reg)
+{
+  char buf[5]; 
+
+  buf[0] = addr | 1;
+  buf[1] = reg;
+  buf[2] = val;
+  transfer (fd, buf, 2, 1);
+  return buf[2];
 }
 
 
@@ -229,6 +242,7 @@ static const struct option lopts[] = {
   { "write16",   0, 0, 'W' },
   { "identify",  0, 0, 'i' },
   { "scan",      0, 0, 'S' },
+  { "read",      0, 0, 'R' },
 
   // Options for LCD
   { "text",      0, 0, 't' },
@@ -248,7 +262,7 @@ static int parse_opts(int argc, char *argv[])
   while (1) {
     int c;
 
-    c = getopt_long(argc, argv, "D:s:d:r:v:a:wWitCm:IS", lopts, NULL);
+    c = getopt_long(argc, argv, "D:s:d:r:v:a:wWitCm:ISR", lopts, NULL);
 
     if (c == -1)
       break;
@@ -280,6 +294,9 @@ static int parse_opts(int argc, char *argv[])
       break;
     case 'W':
       write16mode = 1;
+      break;
+    case 'R':
+      readmode = 1;
       break;
     case 'i':
       if (speed > 100000) speed = 100000;
@@ -468,6 +485,19 @@ int main(int argc, char *argv[])
     }
   }
 
+  if (readmode) {
+    for (i=nonoptions;i<argc;i++) {
+      if (sscanf (argv[i], "%x:%x", &reg, &val) >= 1) {
+	val = get_reg_value8 (fd, reg);
+	printf (" %02x", val);
+      } else {
+        fprintf (stderr, "dont understand reg:val in: %s\n", argv[i]);
+        exit (1);
+      }
+    }
+    printf ("\n");
+  }
+
   if (reg != -1) 
     set_reg_value8 (fd, reg, val); 
 
@@ -482,6 +512,8 @@ int main(int argc, char *argv[])
 
   if (scan)
     do_scan (fd);
+
+
 
   if (monitor_file) 
     do_monitor_file (fd, monitor_file);
