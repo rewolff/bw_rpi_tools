@@ -243,7 +243,7 @@ static int parse_opts(int argc, char *argv[])
   while (1) {
     int c;
 
-    c = getopt_long(argc, argv, "D:s:d:r:v:a:wWitCm:I", lopts, NULL);
+    c = getopt_long(argc, argv, "D:s:d:r:v:a:wWitCm:IS", lopts, NULL);
 
     if (c == -1)
       break;
