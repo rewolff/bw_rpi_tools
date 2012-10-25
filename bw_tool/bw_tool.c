@@ -185,11 +185,16 @@ static void do_scan (int fd)
     buf[0] = add | 1;
     buf[1] = 1;
     transfer (fd, buf, 0x2, 0x20);
-    printf ("%02x: ", add);
     for (i=(mode==I2C_MODE)?0:2;i<0x20;i++) {
-      putchar (mkprintable (buf[i]));
+      if (mkprintable (buf[i]) != '.') break;
     }
-    printf ("\n");
+    if (i != 0x20) {
+      printf ("%02x: ", add);
+      for (i=(mode==I2C_MODE)?0:2;i<0x20;i++) {
+	putchar (mkprintable (buf[i]));
+      }
+      printf ("\n");
+    }
   }
 
 }
