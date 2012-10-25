@@ -248,6 +248,7 @@ static int parse_opts(int argc, char *argv[])
       write16mode = 1;
       break;
     case 'i':
+      if (speed > 100000) speed = 100000;
       ident = 1;
       break;
     case 'I':
