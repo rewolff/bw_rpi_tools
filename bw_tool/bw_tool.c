@@ -140,17 +140,6 @@ static void set_reg_value8 (int fd, int reg, int val)
 }
 
 
-static int get_reg_value8 (int fd, int reg)
-{
-  char buf[5]; 
-
-  buf[0] = addr | 1;
-  buf[1] = reg;
-  buf[2] = val;
-  transfer (fd, buf, 2, 1);
-  return buf[2];
-}
-
 
 static void set_reg_value16 (int fd, int reg, int val)
 {
@@ -161,6 +150,47 @@ static void set_reg_value16 (int fd, int reg, int val)
   buf[2] = val;
   buf[3] = val >> 8;
   transfer (fd, buf, 4, 0);
+}
+
+
+void dump_buffer (char *buf, int n)
+{
+  int i;
+  for (i=0;i<n;i++) 
+    printf ("X%02x ", buf[i]);
+}
+static int get_reg_value8 (int fd, int reg)
+{
+  char buf[5]; 
+
+  buf[0] = addr | 1;
+  buf[1] = reg;
+  transfer (fd, buf, 2, 3);
+  //dump_buffer (buf, 5);
+  return buf[2];
+}
+
+
+static int get_reg_value16 (int fd, int reg)
+{
+  char buf[5]; 
+
+  buf[0] = addr | 1;
+  buf[1] = reg;
+  transfer (fd, buf, 2, 4);
+  //dump_buffer (buf, 5);
+  return buf[2] | (buf[3] << 8);
+}
+
+static int get_reg_value32 (int fd, int reg)
+{
+  char buf[10]; 
+
+  buf[0] = addr | 1;
+  buf[1] = reg;
+  transfer (fd, buf, 2, 6);
+  //dump_buffer (buf, 5);
+  return buf[2] | (buf[3] << 8) | (buf[4] << 16) | (buf[5] << 24);
 }
 
 
@@ -447,7 +477,9 @@ int main(int argc, char *argv[])
   int fd;
   int nonoptions;
   char buf[0x100];
-  int i;
+  int i, rv;
+  char typech;
+
 
   nonoptions = parse_opts(argc, argv);
 
@@ -476,7 +508,7 @@ int main(int argc, char *argv[])
         if (write8mode) 
           set_reg_value8 (fd, reg, val);
         else 
-          set_reg_value16 (fd, reg, val);
+          set_reg_value16(fd, reg, val);
 
       } else {
         fprintf (stderr, "dont understand reg:val in: %s\n", argv[i]);
@@ -487,13 +519,27 @@ int main(int argc, char *argv[])
 
   if (readmode) {
     for (i=nonoptions;i<argc;i++) {
-      if (sscanf (argv[i], "%x:%x", &reg, &val) >= 1) {
-	val = get_reg_value8 (fd, reg);
-	printf (" %02x", val);
-      } else {
-        fprintf (stderr, "dont understand reg:val in: %s\n", argv[i]);
+      rv = sscanf (argv[i], "%x:%c", &reg, &typech);
+      if (rv < 1) {
+        fprintf (stderr, "don't understand reg:type in: %s\n", argv[i]);
         exit (1);
       }
+      if (rv == 1) typech = 'b';
+      switch (typech) {
+      case 'b':	val = get_reg_value8  (fd, reg);break;
+      case 's':	val = get_reg_value16 (fd, reg);break;
+      case 'i':	val = get_reg_value32 (fd, reg);break;
+      default:
+	fprintf (stderr, "Don't understand the type value in %s\n", argv[i]);
+	exit (1);
+      }
+
+      switch (typech) {
+      case 'b':printf ("%02x ", val);break;
+      case 's':printf ("%04x ", val);break;
+      case 'i':printf ("%08x ", val);break;
+      }
+
     }
     printf ("\n");
   }
