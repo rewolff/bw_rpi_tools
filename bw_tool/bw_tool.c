@@ -331,6 +331,7 @@ static int parse_opts(int argc, char *argv[])
       break;
     case 'R':
       readmode = 1;
+      if (speed > 100000) speed = 100000;
       break;
     case 'i':
       if (speed > 100000) speed = 100000;
