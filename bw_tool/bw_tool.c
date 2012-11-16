@@ -39,7 +39,7 @@
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
 
-enum {SPI_MODE = 1, I2C_MODE } ; 
+enum {SPI_MODE = 1, I2C_MODE }; 
 static int mode = SPI_MODE;
 
 static const char *device = "/dev/spidev0.0";
@@ -57,6 +57,7 @@ static int val = -1;
 static int cls = 0;
 static int write8mode, write16mode, ident;
 static int scan = 0;
+
 
 static void pabort(const char *s)
 {
@@ -211,12 +212,14 @@ static void do_ident (int fd)
   putchar ('\n');
 }
 
+
 char mkprintable (char ch)
 {
   if (ch < ' ') return '.';
   if (ch <= '~') return ch;
   return '.';
 }
+
 
 static void do_scan (int fd)
 {
@@ -234,6 +237,7 @@ static void do_scan (int fd)
     if (i != 0x20) {
       printf ("%02x: ", add);
       for (i=(mode==I2C_MODE)?0:2;i<0x20;i++) {
+	if (buf[i] == 0) break;
 	putchar (mkprintable (buf[i]));
       }
       printf ("\n");
