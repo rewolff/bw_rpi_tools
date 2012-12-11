@@ -160,6 +160,9 @@ void dump_buffer (char *buf, int n)
   for (i=0;i<n;i++) 
     printf ("X%02x ", buf[i]);
 }
+
+
+
 static int get_reg_value8 (int fd, int reg)
 {
   char buf[5]; 
@@ -182,6 +185,7 @@ static int get_reg_value16 (int fd, int reg)
   //dump_buffer (buf, 5);
   return buf[2] | (buf[3] << 8);
 }
+
 
 static int get_reg_value32 (int fd, int reg)
 {
@@ -547,6 +551,7 @@ int main(int argc, char *argv[])
 
     }
     printf ("\n");
+    exit (0);
   }
 
   if (reg != -1) 
