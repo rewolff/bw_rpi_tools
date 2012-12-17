@@ -39,7 +39,7 @@
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
 
-enum {SPI_MODE = 1, I2C_MODE } ; 
+enum {SPI_MODE = 1, I2C_MODE }; 
 static int mode = SPI_MODE;
 
 static const char *device = "/dev/spidev0.0";
@@ -57,12 +57,29 @@ static int val = -1;
 static int cls = 0;
 static int write8mode, write16mode, ident;
 static int scan = 0;
+static int hexmode = 0;
+
 
 static void pabort(const char *s)
 {
   perror(s);
   abort();
 }
+
+void dump_buffer (char *buf, int n)
+{
+  int i;
+  for (i=0;i<n;i++) 
+    printf (" %02x", buf[i]);
+}
+
+void dump_buf (char *t, char *buf, int n)
+{
+  printf ("%s", t);
+  dump_buffer (buf, n);
+  printf ("\n");
+}
+
 
 
 static void spi_txrx (int fd, char *buf, int tlen, int rlen)
@@ -78,11 +95,14 @@ static void spi_txrx (int fd, char *buf, int tlen, int rlen)
   else             tr.len = tlen; 
   tr.tx_buf = (unsigned long) buf; 
   tr.rx_buf = (unsigned long) buf; 
+
+    // dump_buf ("SND: ", buf, tr.len);
   
   ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr);
   if (ret < 1)
     pabort("can't send spi message");
 
+    // dump_buf ("REC: ", buf, tr.len);
 }
 
 
@@ -153,12 +173,6 @@ static void set_reg_value16 (int fd, int reg, int val)
 }
 
 
-void dump_buffer (char *buf, int n)
-{
-  int i;
-  for (i=0;i<n;i++) 
-    printf ("X%02x ", buf[i]);
-}
 static int get_reg_value8 (int fd, int reg)
 {
   char buf[5]; 
@@ -181,6 +195,7 @@ static int get_reg_value16 (int fd, int reg)
   //dump_buffer (buf, 5);
   return buf[2] | (buf[3] << 8);
 }
+
 
 static int get_reg_value32 (int fd, int reg)
 {
@@ -211,12 +226,14 @@ static void do_ident (int fd)
   putchar ('\n');
 }
 
+
 char mkprintable (char ch)
 {
   if (ch < ' ') return '.';
   if (ch <= '~') return ch;
   return '.';
 }
+
 
 static void do_scan (int fd)
 {
@@ -234,6 +251,7 @@ static void do_scan (int fd)
     if (i != 0x20) {
       printf ("%02x: ", add);
       for (i=(mode==I2C_MODE)?0:2;i<0x20;i++) {
+	if (buf[i] == 0) break;
 	putchar (mkprintable (buf[i]));
       }
       printf ("\n");
@@ -241,6 +259,8 @@ static void do_scan (int fd)
   }
 
 }
+
+
 
 static void print_usage(const char *prog)
 {
@@ -278,6 +298,8 @@ static const struct option lopts[] = {
   { "text",      0, 0, 't' },
   { "cls",       0, 0, 'C' },
   { "monitor",   1, 0, 'm' },
+
+  { "hex",       0, 0, 'h' },
 
 
   { "i2c",       0, 0, 'I' },
@@ -319,6 +341,9 @@ static int parse_opts(int argc, char *argv[])
       sscanf (optarg, "%x", &addr);
       break;
 
+    case 'h':
+      hexmode = 1;
+      break;
     case 'w':
       write8mode = 1;
       break;
@@ -326,6 +351,7 @@ static int parse_opts(int argc, char *argv[])
       write16mode = 1;
       break;
     case 'R':
+      if (speed > 100000) speed = 100000;
       readmode = 1;
       break;
     case 'i':
@@ -515,6 +541,7 @@ int main(int argc, char *argv[])
         exit (1);
       }
     }
+    exit (0);
   }
 
   if (readmode) {
@@ -542,6 +569,29 @@ int main(int argc, char *argv[])
 
     }
     printf ("\n");
+    exit (0);
+  }
+
+
+  if (hexmode) {
+    char buf[0x40];
+    int l, v;
+
+    l = argc - nonoptions; 
+    for (i=nonoptions;i<argc;i++) {
+      rv = sscanf (argv[i], "%x", &v);
+      if (rv < 1) {
+        fprintf (stderr, "don't understand reg:type in: %s\n", argv[i]);
+        exit (1);
+      }
+
+      buf[i-nonoptions] = v;
+    }
+    dump_buf ("send: ", buf, l);
+    transfer (fd, buf, l, 0x20);
+    dump_buf ("got:  ", buf, l);
+    printf ("\n");
+    exit (0);
   }
 
   if (reg != -1) 
