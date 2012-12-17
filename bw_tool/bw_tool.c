@@ -95,14 +95,11 @@ static void spi_txrx (int fd, char *buf, int tlen, int rlen)
   else             tr.len = tlen; 
   tr.tx_buf = (unsigned long) buf; 
   tr.rx_buf = (unsigned long) buf; 
-
-    // dump_buf ("SND: ", buf, tr.len);
   
   ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr);
   if (ret < 1)
     pabort("can't send spi message");
 
-    // dump_buf ("REC: ", buf, tr.len);
 }
 
 
