@@ -57,6 +57,7 @@ static int val = -1;
 static int cls = 0;
 static int write8mode, write16mode, ident;
 static int scan = 0;
+static int hexmode = 0;
 
 
 static void pabort(const char *s)
@@ -158,9 +159,15 @@ void dump_buffer (char *buf, int n)
 {
   int i;
   for (i=0;i<n;i++) 
-    printf ("X%02x ", buf[i]);
+    printf (" %02x", buf[i]);
 }
 
+void dump_buf (char *t, char *buf, int n)
+{
+  printf ("%s", t);
+  dump_buffer (buf, n);
+  printf ("\n");
+}
 
 
 static int get_reg_value8 (int fd, int reg)
@@ -250,6 +257,8 @@ static void do_scan (int fd)
 
 }
 
+
+
 static void print_usage(const char *prog)
 {
   printf("Usage: %s [-DsbdlHOLC3]\n", prog);
@@ -286,6 +295,8 @@ static const struct option lopts[] = {
   { "text",      0, 0, 't' },
   { "cls",       0, 0, 'C' },
   { "monitor",   1, 0, 'm' },
+
+  { "hex",       0, 0, 'h' },
 
 
   { "i2c",       0, 0, 'I' },
@@ -327,6 +338,9 @@ static int parse_opts(int argc, char *argv[])
       sscanf (optarg, "%x", &addr);
       break;
 
+    case 'h':
+      hexmode = 1;
+      break;
     case 'w':
       write8mode = 1;
       break;
@@ -524,6 +538,7 @@ int main(int argc, char *argv[])
         exit (1);
       }
     }
+    exit (0);
   }
 
   if (readmode) {
@@ -550,6 +565,28 @@ int main(int argc, char *argv[])
       }
 
     }
+    printf ("\n");
+    exit (0);
+  }
+
+
+  if (hexmode) {
+    char buf[0x40];
+    int l, v;
+
+    l = argc - nonoptions; 
+    for (i=nonoptions;i<argc;i++) {
+      rv = sscanf (argv[i], "%x", &v);
+      if (rv < 1) {
+        fprintf (stderr, "don't understand reg:type in: %s\n", argv[i]);
+        exit (1);
+      }
+
+      buf[i-nonoptions] = v;
+    }
+    dump_buf ("send: ", buf, l);
+    transfer (fd, buf, l, 0x20);
+    dump_buf ("got:  ", buf, l);
     printf ("\n");
     exit (0);
   }
