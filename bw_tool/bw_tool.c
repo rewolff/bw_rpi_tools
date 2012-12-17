@@ -66,6 +66,21 @@ static void pabort(const char *s)
   abort();
 }
 
+void dump_buffer (char *buf, int n)
+{
+  int i;
+  for (i=0;i<n;i++) 
+    printf (" %02x", buf[i]);
+}
+
+void dump_buf (char *t, char *buf, int n)
+{
+  printf ("%s", t);
+  dump_buffer (buf, n);
+  printf ("\n");
+}
+
+
 
 static void spi_txrx (int fd, char *buf, int tlen, int rlen)
 {
@@ -152,21 +167,6 @@ static void set_reg_value16 (int fd, int reg, int val)
   buf[2] = val;
   buf[3] = val >> 8;
   transfer (fd, buf, 4, 0);
-}
-
-
-void dump_buffer (char *buf, int n)
-{
-  int i;
-  for (i=0;i<n;i++) 
-    printf (" %02x", buf[i]);
-}
-
-void dump_buf (char *t, char *buf, int n)
-{
-  printf ("%s", t);
-  dump_buffer (buf, n);
-  printf ("\n");
 }
 
 
