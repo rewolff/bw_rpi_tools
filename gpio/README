@@ -21,11 +21,8 @@ GPIO18, GPIO23, GPIO24, GPIO25, GPIO4, GPIO17, GPIO21, GPIO22
 are also connected to the P1 connector. 
 
 It would be wise not to touch any other GPIO pins, as those might 
-be involved in keeping the Raspberry Pi working. 
-
-At the moment it is difficult to find information about what they would do
-as the schematics hasn't been released yet. 
-
+be involved in keeping the Raspberry Pi working. Check the schematics
+to find out what they do. 
 
 You can control the separate IOs with 
 gpio_setfunc (configure the function of the pin). Chose from
