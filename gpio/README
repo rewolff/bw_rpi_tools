@@ -62,9 +62,6 @@ Next we configure those two outputs for ALT0 function: the I2C module
 (BSC in Broadcom language). 
 
 
-The send_spi program allows you to send data on SPI bus 0. It will have
-to be modified a little for SPI bus 1. I don't want to clutter the 
-commandline with the busnumber. Suggestions?
 
 
 

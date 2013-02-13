@@ -1,4 +1,0 @@
-#!/bin/sh
-send_spi 82 0 `string_to_hex $*`
-
-
