@@ -1,5 +1,0 @@
-#!/bin/sh
-xy=`expr  $1 \* 32 + $2`
-xyhex=`printf '%x\n' $xy`
-send_spi 82 11 $xyhex
-

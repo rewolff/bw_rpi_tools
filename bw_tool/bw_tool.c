@@ -91,8 +91,9 @@ static void spi_txrx (int fd, char *buf, int tlen, int rlen)
     .bits_per_word = bits,
   };
 
-  if (rlen > tlen) tr.len = rlen; 
-  else             tr.len = tlen; 
+  // if (rlen > tlen) tr.len = rlen; 
+  // else             tr.len = tlen;
+  tr.len = tlen + rlen;
   tr.tx_buf = (unsigned long) buf; 
   tr.rx_buf = (unsigned long) buf; 
   
@@ -117,7 +118,7 @@ static void i2c_txrx (int fd, char *buf, int tlen, int rlen)
    }
    //XXX: check return code. 
    if (rlen) 
-     if (read (fd, buf, rlen) != rlen) 
+     if (read (fd, buf+tlen, rlen) != rlen) 
         pabort ("can't read i2c");
 }
 
@@ -176,7 +177,7 @@ static int get_reg_value8 (int fd, int reg)
 
   buf[0] = addr | 1;
   buf[1] = reg;
-  transfer (fd, buf, 2, 3);
+  transfer (fd, buf, 2, 1);
   //dump_buffer (buf, 5);
   return buf[2];
 }
@@ -188,7 +189,7 @@ static int get_reg_value16 (int fd, int reg)
 
   buf[0] = addr | 1;
   buf[1] = reg;
-  transfer (fd, buf, 2, 4);
+  transfer (fd, buf, 2, 2);
   //dump_buffer (buf, 5);
   return buf[2] | (buf[3] << 8);
 }
@@ -200,7 +201,7 @@ static int get_reg_value32 (int fd, int reg)
 
   buf[0] = addr | 1;
   buf[1] = reg;
-  transfer (fd, buf, 2, 6);
+  transfer (fd, buf, 2, 4);
   //dump_buffer (buf, 5);
   return buf[2] | (buf[3] << 8) | (buf[4] << 16) | (buf[5] << 24);
 }
@@ -585,7 +586,7 @@ int main(int argc, char *argv[])
       buf[i-nonoptions] = v;
     }
     dump_buf ("send: ", buf, l);
-    transfer (fd, buf, l, 0x20);
+    transfer (fd, buf, l, 0);
     dump_buf ("got:  ", buf, l);
     printf ("\n");
     exit (0);
