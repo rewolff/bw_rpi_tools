@@ -91,8 +91,9 @@ static void spi_txrx (int fd, char *buf, int tlen, int rlen)
     .bits_per_word = bits,
   };
 
-  if (rlen > tlen) tr.len = rlen; 
-  else             tr.len = tlen; 
+  // if (rlen > tlen) tr.len = rlen; 
+  // else             tr.len = tlen;
+  tr.len = tlen + rlen;
   tr.tx_buf = (unsigned long) buf; 
   tr.rx_buf = (unsigned long) buf; 
   
@@ -585,7 +586,7 @@ int main(int argc, char *argv[])
       buf[i-nonoptions] = v;
     }
     dump_buf ("send: ", buf, l);
-    transfer (fd, buf, l, 0x20);
+    transfer (fd, buf, l, 0);
     dump_buf ("got:  ", buf, l);
     printf ("\n");
     exit (0);
