@@ -53,7 +53,7 @@ static char *monitor_file;
 static int readmode = 0;
 
 static int reg = -1;
-static int val = -1;
+static long long val = -1;
 static int cls = 0;
 static int write8mode, write16mode, ident;
 static int scan = 0;
@@ -204,6 +204,19 @@ static int get_reg_value32 (int fd, int reg)
   transfer (fd, buf, 2, 4);
   //dump_buffer (buf, 5);
   return buf[2] | (buf[3] << 8) | (buf[4] << 16) | (buf[5] << 24);
+}
+
+static long long get_reg_value64 (int fd, int reg)
+{
+  char buf[10]; 
+  unsigned int t, tt; 
+
+  buf[0] = addr | 1;
+  buf[1] = reg;
+  transfer (fd, buf, 2, 8);
+  t  = buf[2] | (buf[3] << 8) | (buf[4] << 16) | (buf[5] << 24);
+  tt = buf[6] | (buf[7] << 8) | (buf[8] << 16) | (buf[9] << 24);
+  return ((long long) tt << 32)  | t;
 }
 
 
@@ -527,7 +540,7 @@ int main(int argc, char *argv[])
 
   if (write8mode || write16mode) {
     for (i=nonoptions;i<argc;i++) {
-      if (sscanf (argv[i], "%x:%x", &reg, &val) == 2) {
+      if (sscanf (argv[i], "%x:%llx", &reg, &val) == 2) {
 
         if (write8mode) 
           set_reg_value8 (fd, reg, val);
@@ -554,15 +567,17 @@ int main(int argc, char *argv[])
       case 'b':	val = get_reg_value8  (fd, reg);break;
       case 's':	val = get_reg_value16 (fd, reg);break;
       case 'i':	val = get_reg_value32 (fd, reg);break;
+      case 'l':	val = get_reg_value64 (fd, reg);break;
       default:
 	fprintf (stderr, "Don't understand the type value in %s\n", argv[i]);
 	exit (1);
       }
 
       switch (typech) {
-      case 'b':printf ("%02x ", val);break;
-      case 's':printf ("%04x ", val);break;
-      case 'i':printf ("%08x ", val);break;
+      case 'b':printf ("%02llx ", val);break;
+      case 's':printf ("%04llx ", val);break;
+      case 'i':printf ("%08llx ", val);break;
+      case 'l':printf ("%016llx ", val);break;
       }
 
     }
