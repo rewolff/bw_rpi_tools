@@ -55,7 +55,7 @@ static int readmode = 0;
 static int reg = -1;
 static long long val = -1;
 static int cls = 0;
-static int write8mode, write16mode, ident;
+static int write8mode, write16mode, ident, readee;
 static int scan = 0;
 static int hexmode = 0;
 
@@ -238,6 +238,26 @@ static void do_ident (int fd)
 }
 
 
+static void do_readee (int fd)
+{
+#define EELEN 0x80
+  char buf[EELEN];
+  int i;
+
+  buf [0] = addr | 1;
+  buf [1] = 2;
+
+  transfer (fd, buf, 0x2, 0x80);
+
+  for (i = 0;i < EELEN;i++) {
+    if (!(i & 0xf)) printf ("\n%04x:  ", i); 
+    printf ("%02x ", ((unsigned char *) buf)[i+2]);
+
+  }
+  printf ("\n");
+}
+
+
 char mkprintable (char ch)
 {
   if (ch < ' ') return '.';
@@ -304,6 +324,8 @@ static const struct option lopts[] = {
   { "identify",  0, 0, 'i' },
   { "scan",      0, 0, 'S' },
   { "read",      0, 0, 'R' },
+  { "eeprom",    0, 0, 'e' },
+
 
   // Options for LCD
   { "text",      0, 0, 't' },
@@ -325,7 +347,7 @@ static int parse_opts(int argc, char *argv[])
   while (1) {
     int c;
 
-    c = getopt_long(argc, argv, "D:s:d:r:v:a:wWitCm:ISR", lopts, NULL);
+    c = getopt_long(argc, argv, "D:s:d:r:v:a:wWietCm:ISR", lopts, NULL);
 
     if (c == -1)
       break;
@@ -352,6 +374,9 @@ static int parse_opts(int argc, char *argv[])
       sscanf (optarg, "%x", &addr);
       break;
 
+    case 'e':
+      readee = 1;
+      break;
     case 'h':
       hexmode = 1;
       break;
@@ -475,7 +500,8 @@ char *get_file_line (char *fname, int lno)
     buf [0] = 0;
     p = fgets (buf, 0x3f, f);
     if (!p) return p;
-  }
+  }2 x I2C Kabel M-F ()
+
   fclose (f);
   buf[strlen(buf)-1] = 0; // chop!
   return buf;
@@ -536,6 +562,9 @@ int main(int argc, char *argv[])
   if (ident) 
     do_ident (fd);
 
+  if (readee) 
+    do_readee (fd);
+
   if (cls) set_reg_value8 (fd, 0x10, 0xaa);
 
   if (write8mode || write16mode) {
@@ -587,7 +616,7 @@ int main(int argc, char *argv[])
 
 
   if (hexmode) {
-    char buf[0x40];
+    char buf[0x400];
     int l, v;
 
     l = argc - nonoptions; 
