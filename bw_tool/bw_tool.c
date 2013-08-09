@@ -500,7 +500,7 @@ char *get_file_line (char *fname, int lno)
     buf [0] = 0;
     p = fgets (buf, 0x3f, f);
     if (!p) return p;
-  }2 x I2C Kabel M-F ()
+  }
 
   fclose (f);
   buf[strlen(buf)-1] = 0; // chop!
