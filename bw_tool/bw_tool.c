@@ -299,13 +299,16 @@ static void print_usage(const char *prog)
   puts("  -D --device   device to use (default /dev/spidev1.1)\n"
        "  -s --speed    max speed (Hz)\n"
        "  -d --delay    delay (usec)\n"
-       "  -b --bpw      bits per word \n"
-       "  -l --loop     loopback\n"
-       "  -H --cpha     clock phase\n"
-       "  -O --cpol     clock polarity\n"
-       "  -L --lsb      least significant bit first\n"
-       "  -C --cls      clear screen\n"
-       "  -3 --3wire    SI/SO signals shared\n");
+       "  -r --reg      \n"
+       "  -v --val      value\n"
+       "  -a --addr     address\n"
+       "  -w --write8   write an octet\n"
+       "  -W --write16  write a double-octet\n"
+       "  -i --identify ?\n"
+       "  -S --scan     ?\n"
+       "  -R --read     ?\n"
+       "  -I --i2c      I2C mode (uses /dev/i2c-0, change with -D)\n");
+
   exit(1);
 }
 
@@ -571,6 +574,8 @@ int main(int argc, char *argv[])
     for (i=nonoptions;i<argc;i++) {
       if (sscanf (argv[i], "%x:%llx", &reg, &val) == 2) {
 
+        fprintf (stdout, "Writing register 0x%02X val 0x%08llX\n",reg,val);
+
         if (write8mode) 
           set_reg_value8 (fd, reg, val);
         else 
@@ -587,6 +592,7 @@ int main(int argc, char *argv[])
   if (readmode) {
     for (i=nonoptions;i<argc;i++) {
       rv = sscanf (argv[i], "%x:%c", &reg, &typech);
+      fprintf (stdout, "Reading register 0x%02X type %c\n",reg,typech);
       if (rv < 1) {
         fprintf (stderr, "don't understand reg:type in: %s\n", argv[i]);
         exit (1);
