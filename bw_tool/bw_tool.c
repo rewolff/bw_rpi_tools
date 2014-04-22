@@ -1,13 +1,15 @@
 /*
  * bw_tool.c. 
  *
- * Control the BitWizard SPI expansion boards. 
+ * Control the BitWizard SPI and I2C expansion boards on
+ * Linux computers with spidev or i2c-dev. 
  *
  * based on: 
  * SPI testing utility (using spidev driver)
  *
  * Copyright (c) 2007  MontaVista Software, Inc.
  * Copyright (c) 2007  Anton Vorontsov <avorontsov@ru.mvista.com>
+ * Copyright (c) 2012-2013  Roger Wolff <R.E.Wolff@BitWizard.nl>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -55,10 +57,13 @@ static int readmode = 0;
 static int reg = -1;
 static long long val = -1;
 static int cls = 0;
-static int write8mode, write16mode, ident, readee;
+static int write8mode, writemiscmode, ident, readee;
 static int scan = 0;
 static int hexmode = 0;
 
+static int debug = 0;
+#define DEBUG_REGSETTING 0x0001
+#define DEBUG_TRANSFER   0x0002
 
 static void pabort(const char *s)
 {
@@ -125,10 +130,14 @@ static void i2c_txrx (int fd, char *buf, int tlen, int rlen)
 
 static void transfer(int fd, char *buf, int tlen, int rlen)
 {
+  if (debug & DEBUG_TRANSFER) 
+    dump_buf ("Before tx:", buf, tlen);
   if (mode == SPI_MODE) 
      spi_txrx (fd, buf, tlen, rlen);
   else
      i2c_txrx (fd, buf, tlen, rlen);
+  if (debug & DEBUG_TRANSFER) 
+    dump_buf ("rx:", buf, tlen+rlen);
 }
 
 
@@ -140,8 +149,14 @@ static void send_text (int fd, char *str)
   l = strlen (str);
   buf = malloc (l + 5); 
   buf[0] = addr;
-  buf[1] = 0; 
+  if (reg <= 0)
+    buf [1] = 0; 
+  else {
+    buf [1] = reg; 
+    l++;
+  }
   strcpy (buf+2, str); 
+  strcat (buf+2, "\xff\0"); // always append the 0xff, but it won't be sent if reg = 0;
   transfer (fd, buf, l+2, 0);
   free (buf);
 }
@@ -168,6 +183,37 @@ static void set_reg_value16 (int fd, int reg, int val)
   buf[2] = val;
   buf[3] = val >> 8;
   transfer (fd, buf, 4, 0);
+}
+
+static void set_reg_value32 (int fd, int reg, int val)
+{
+  char buf[15]; 
+
+  buf[0] = addr;
+  buf[1] = reg;
+  buf[2] = val;
+  buf[3] = val >> 8;
+  buf[4] = val >> 16;
+  buf[5] = val >> 24;
+  transfer (fd, buf, 6, 0);
+}
+
+
+static void set_reg_value64 (int fd, int reg, long long val)
+{
+  char buf[15]; 
+
+  buf[0] = addr;
+  buf[1] = reg;
+  buf[2] = val;
+  buf[3] = val >> 8;
+  buf[4] = val >> 16;
+  buf[5] = val >> 24;
+  buf[6] = val >> 32;
+  buf[7] = val >> 40;
+  buf[8] = val >> 48;
+  buf[9] = val >> 56;
+  transfer (fd, buf, 10, 0);
 }
 
 
@@ -299,13 +345,16 @@ static void print_usage(const char *prog)
   puts("  -D --device   device to use (default /dev/spidev1.1)\n"
        "  -s --speed    max speed (Hz)\n"
        "  -d --delay    delay (usec)\n"
-       "  -b --bpw      bits per word \n"
-       "  -l --loop     loopback\n"
-       "  -H --cpha     clock phase\n"
-       "  -O --cpol     clock polarity\n"
-       "  -L --lsb      least significant bit first\n"
-       "  -C --cls      clear screen\n"
-       "  -3 --3wire    SI/SO signals shared\n");
+       "  -r --reg      \n"
+       "  -v --val      value\n"
+       "  -a --addr     address\n"
+       "  -w --write8   write an octet\n"
+       "  -W --write16  write a double-octet\n"
+       "  -i --identify ?\n"
+       "  -S --scan     ?\n"
+       "  -R --read     ?\n"
+       "  -I --i2c      I2C mode (uses /dev/i2c-0, change with -D)\n");
+
   exit(1);
 }
 
@@ -320,7 +369,7 @@ static const struct option lopts[] = {
   { "val",       1, 0, 'v' },
   { "addr",      1, 0, 'a' },
   { "write8",    0, 0, 'w' },
-  { "write16",   0, 0, 'W' },
+  { "write",     0, 0, 'W' },
   { "identify",  0, 0, 'i' },
   { "scan",      0, 0, 'S' },
   { "read",      0, 0, 'R' },
@@ -334,9 +383,9 @@ static const struct option lopts[] = {
 
   { "hex",       0, 0, 'h' },
 
-
   { "i2c",       0, 0, 'I' },
 
+  { "verbose",   1, 0, 'V' },
   { NULL, 0, 0, 0 },
 };
 
@@ -347,7 +396,7 @@ static int parse_opts(int argc, char *argv[])
   while (1) {
     int c;
 
-    c = getopt_long(argc, argv, "D:s:d:r:v:a:wWietCm:ISR", lopts, NULL);
+    c = getopt_long(argc, argv, "D:s:d:r:v:a:wWietCm:ISRV:", lopts, NULL);
 
     if (c == -1)
       break;
@@ -370,6 +419,9 @@ static int parse_opts(int argc, char *argv[])
     case 'v':
       val = atoi(optarg);
       break;
+    case 'V':
+      debug = atoi(optarg);
+      break;
     case 'a':
       sscanf (optarg, "%x", &addr);
       break;
@@ -384,7 +436,7 @@ static int parse_opts(int argc, char *argv[])
       write8mode = 1;
       break;
     case 'W':
-      write16mode = 1;
+      writemiscmode = 1;
       break;
     case 'R':
       if (speed > 100000) speed = 100000;
@@ -501,6 +553,7 @@ char *get_file_line (char *fname, int lno)
     p = fgets (buf, 0x3f, f);
     if (!p) return p;
   }
+
   fclose (f);
   buf[strlen(buf)-1] = 0; // chop!
   return buf;
@@ -545,7 +598,7 @@ int main(int argc, char *argv[])
 
   nonoptions = parse_opts(argc, argv);
 
-  if (write8mode && write16mode) {
+  if (write8mode && writemiscmode) {
     fprintf (stderr, "Can't use write8 and write16 at the same time\n");
     exit (1);
   }
@@ -566,9 +619,11 @@ int main(int argc, char *argv[])
 
   if (cls) set_reg_value8 (fd, 0x10, 0xaa);
 
-  if (write8mode || write16mode) {
+  if (write8mode) {
     for (i=nonoptions;i<argc;i++) {
       if (sscanf (argv[i], "%x:%llx", &reg, &val) == 2) {
+	if (debug & DEBUG_REGSETTING)
+           fprintf (stdout, "Writing register 0x%02X val 0x%08llX\n",reg,val);
 
         if (write8mode) 
           set_reg_value8 (fd, reg, val);
@@ -583,9 +638,32 @@ int main(int argc, char *argv[])
     exit (0);
   }
 
+  if (writemiscmode) {
+    for (i=nonoptions;i<argc;i++) {
+      rv = sscanf (argv[i], "%x:%llx:%c", &reg, &val, &typech);
+      if (rv < 2) {
+        fprintf (stderr, "don't understand reg:val:type in: %s\n", argv[i]);
+        exit (1);
+      }
+      if (rv == 2) typech = 'b';
+      switch (typech) {
+      case 'b':	set_reg_value8  (fd, reg, val);break;
+      case 's':	set_reg_value16 (fd, reg, val);break;
+      case 'i':	set_reg_value32 (fd, reg, val);break;
+      case 'l':	set_reg_value64 (fd, reg, val);break;
+      default:
+	fprintf (stderr, "Don't understand the type value in %s\n", argv[i]);
+	exit (1);
+      }
+    }
+    exit (0);
+  }
+
   if (readmode) {
     for (i=nonoptions;i<argc;i++) {
       rv = sscanf (argv[i], "%x:%c", &reg, &typech);
+      if (debug & DEBUG_REGSETTING)
+        fprintf (stdout, "Reading register 0x%02X type %c\n",reg,typech);
       if (rv < 1) {
         fprintf (stderr, "don't understand reg:type in: %s\n", argv[i]);
         exit (1);
@@ -615,7 +693,7 @@ int main(int argc, char *argv[])
 
 
   if (hexmode) {
-    char buf[0x40];
+    char buf[0x400];
     int l, v;
 
     l = argc - nonoptions; 
@@ -635,9 +713,6 @@ int main(int argc, char *argv[])
     exit (0);
   }
 
-  if (reg != -1) 
-    set_reg_value8 (fd, reg, val); 
-
   if (text) {
     buf [0] = 0;
     for (i=nonoptions; i < argc;i++) {
@@ -645,12 +720,14 @@ int main(int argc, char *argv[])
       strcat (buf, argv[i]);
     }
     send_text (fd, buf);
+    exit (0);
   }
+
+  if (reg != -1) 
+    set_reg_value8 (fd, reg, val); 
 
   if (scan)
     do_scan (fd);
-
-
 
   if (monitor_file) 
     do_monitor_file (fd, monitor_file);
