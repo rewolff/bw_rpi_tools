@@ -68,7 +68,7 @@ static int debug = 0;
 static void pabort(const char *s)
 {
   perror(s);
-  abort();
+  exit(1);
 }
 
 void dump_buffer (char *buf, int n)
