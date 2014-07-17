@@ -386,6 +386,7 @@ static const struct option lopts[] = {
   { "i2c",       0, 0, 'I' },
 
   { "verbose",   1, 0, 'V' },
+  { "help",      0, 0, '?' },
   { NULL, 0, 0, 0 },
 };
 
@@ -464,6 +465,11 @@ static int parse_opts(int argc, char *argv[])
 
     case 'm':
       monitor_file = strdup (optarg);
+      break;
+
+    case '?':
+      print_usage (argv[0]);
+      exit (0);
       break;
 
     default:
@@ -595,6 +601,11 @@ int main(int argc, char *argv[])
   int i, rv;
   char typech;
 
+
+  if (argc <= 1) {
+    print_usage (argv[0]);
+    exit (0);
+  }
 
   nonoptions = parse_opts(argc, argv);
 
