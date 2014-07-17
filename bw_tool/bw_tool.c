@@ -350,9 +350,9 @@ static void print_usage(const char *prog)
        "  -a --addr     address\n"
        "  -w --write8   write an octet\n"
        "  -W --write16  write a double-octet\n"
-       "  -i --identify ?\n"
-       "  -S --scan     ?\n"
-       "  -R --read     ?\n"
+       "  -i --identify Identify the indicated device\n"
+       "  -S --scan     Scan the bus for devices \n"
+       "  -R --read     multi-datasize read\n"
        "  -I --i2c      I2C mode (uses /dev/i2c-0, change with -D)\n");
 
   exit(1);
