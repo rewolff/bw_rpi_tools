@@ -68,7 +68,7 @@ static int debug = 0;
 static void pabort(const char *s)
 {
   perror(s);
-  abort();
+  exit(1);
 }
 
 void dump_buffer (char *buf, int n)
@@ -350,9 +350,9 @@ static void print_usage(const char *prog)
        "  -a --addr     address\n"
        "  -w --write8   write an octet\n"
        "  -W --write16  write a double-octet\n"
-       "  -i --identify ?\n"
-       "  -S --scan     ?\n"
-       "  -R --read     ?\n"
+       "  -i --identify Identify the indicated device\n"
+       "  -S --scan     Scan the bus for devices \n"
+       "  -R --read     multi-datasize read\n"
        "  -I --i2c      I2C mode (uses /dev/i2c-0, change with -D)\n");
 
   exit(1);
@@ -386,6 +386,7 @@ static const struct option lopts[] = {
   { "i2c",       0, 0, 'I' },
 
   { "verbose",   1, 0, 'V' },
+  { "help",      0, 0, '?' },
   { NULL, 0, 0, 0 },
 };
 
@@ -464,6 +465,11 @@ static int parse_opts(int argc, char *argv[])
 
     case 'm':
       monitor_file = strdup (optarg);
+      break;
+
+    case '?':
+      print_usage (argv[0]);
+      exit (0);
       break;
 
     default:
@@ -595,6 +601,11 @@ int main(int argc, char *argv[])
   int i, rv;
   char typech;
 
+
+  if (argc <= 1) {
+    print_usage (argv[0]);
+    exit (0);
+  }
 
   nonoptions = parse_opts(argc, argv);
 
