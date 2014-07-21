@@ -276,7 +276,7 @@ static void do_ident (int fd)
 
   transfer (fd, buf, 0x2,0x20);
 
-  for (i= (mode==I2C_MODE)?0:2 ;i<0x20;i++) {
+  for (i= 2 ;i<0x20;i++) {
     if (!buf[i]) break;
     putchar (buf[i]);
   }
