@@ -60,6 +60,7 @@ static int cls = 0;
 static int write8mode, writemiscmode, ident, readee;
 static int scan = 0;
 static int hexmode = 0;
+static char numberformat = 'x';
 
 static int debug = 0;
 #define DEBUG_REGSETTING 0x0001
@@ -353,7 +354,9 @@ static void print_usage(const char *prog)
        "  -i --identify Identify the indicated device\n"
        "  -S --scan     Scan the bus for devices \n"
        "  -R --read     multi-datasize read\n"
-       "  -I --i2c      I2C mode (uses /dev/i2c-0, change with -D)\n");
+       "  -I --i2c      I2C mode (uses /dev/i2c-0, change with -D)\n"
+       "  -1 --decimal  Numbers are decimal. (registers remain in hex)\n"
+  );
 
   exit(1);
 }
@@ -384,6 +387,7 @@ static const struct option lopts[] = {
   { "hex",       0, 0, 'h' },
 
   { "i2c",       0, 0, 'I' },
+  { "decimal",   0, 0, '1' },
 
   { "verbose",   1, 0, 'V' },
   { "help",      0, 0, '?' },
@@ -461,6 +465,10 @@ static int parse_opts(int argc, char *argv[])
 
     case 'C':
       cls = 1;
+      break;
+
+    case '1':
+      numberformat = 'd';
       break;
 
     case 'm':
@@ -600,7 +608,7 @@ int main(int argc, char *argv[])
   char buf[0x100];
   int i, rv;
   char typech;
-
+  char format[32];
 
   if (argc <= 1) {
     print_usage (argv[0]);
@@ -631,16 +639,12 @@ int main(int argc, char *argv[])
   if (cls) set_reg_value8 (fd, 0x10, 0xaa);
 
   if (write8mode) {
+    sprintf (format, "%%x:%%ll%c", numberformat);
     for (i=nonoptions;i<argc;i++) {
-      if (sscanf (argv[i], "%x:%llx", &reg, &val) == 2) {
+      if (sscanf (argv[i], format, &reg, &val) == 2) {
 	if (debug & DEBUG_REGSETTING)
            fprintf (stdout, "Writing register 0x%02X val 0x%08llX\n",reg,val);
-
-        if (write8mode) 
-          set_reg_value8 (fd, reg, val);
-        else 
-          set_reg_value16(fd, reg, val);
-
+        set_reg_value8 (fd, reg, val);
       } else {
         fprintf (stderr, "dont understand reg:val in: %s\n", argv[i]);
         exit (1);
@@ -651,7 +655,8 @@ int main(int argc, char *argv[])
 
   if (writemiscmode) {
     for (i=nonoptions;i<argc;i++) {
-      rv = sscanf (argv[i], "%x:%llx:%c", &reg, &val, &typech);
+      sprintf (format, "%%x:%%ll%c:%%c", numberformat);
+      rv = sscanf (argv[i], format, &reg, &val, &typech);
       if (rv < 2) {
         fprintf (stderr, "don't understand reg:val:type in: %s\n", argv[i]);
         exit (1);
@@ -690,11 +695,15 @@ int main(int argc, char *argv[])
 	exit (1);
       }
 
-      switch (typech) {
-      case 'b':printf ("%02llx ", val);break;
-      case 's':printf ("%04llx ", val);break;
-      case 'i':printf ("%08llx ", val);break;
-      case 'l':printf ("%016llx ", val);break;
+      if (numberformat == 'x') {
+        switch (typech) {
+        case 'b':printf ("%02llx ", val);break;
+        case 's':printf ("%04llx ", val);break;
+        case 'i':printf ("%08llx ", val);break;
+        case 'l':printf ("%016llx ", val);break;
+        }
+      } else {
+        printf ("%lld ", val);
       }
 
     }

@@ -11,8 +11,14 @@
 
 // Access from ARM Running Linux
 
+
+// This is for the original "pi"
 #define BCM2708_PERI_BASE        0x20000000
-#define GPIO_BASE                (BCM2708_PERI_BASE + 0x200000) /* GPIO controller */
+// This is for the new (as of late 2014/early 2015) "pi 2" (with BCM2836)
+//#define BCM2708_PERI_BASE 0x3F000000     
+
+#define GPIO_BASE   (BCM2708_PERI_BASE + 0x200000) /* GPIO controller */
+
 
 #define BCM2835_NUMIOS 55
 
