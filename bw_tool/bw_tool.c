@@ -350,7 +350,7 @@ static void print_usage(const char *prog)
        "  -v --val      value\n"
        "  -a --addr     address\n"
        "  -w --write8   write an octet\n"
-       "  -W --write16  write a double-octet\n"
+       "  -W --write    write arbitrary type\n"
        "  -i --identify Identify the indicated device\n"
        "  -S --scan     Scan the bus for devices \n"
        "  -R --read     multi-datasize read\n"
@@ -401,7 +401,7 @@ static int parse_opts(int argc, char *argv[])
   while (1) {
     int c;
 
-    c = getopt_long(argc, argv, "D:s:d:r:v:a:wWietCm:ISRV:", lopts, NULL);
+    c = getopt_long(argc, argv, "D:s:d:r:v:a:wWietCm:I1SRV:", lopts, NULL);
 
     if (c == -1)
       break;
