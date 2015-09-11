@@ -41,7 +41,7 @@
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
 
-enum {SPI_MODE = 1, I2C_MODE }; 
+enum {SPI_MODE = 1, I2C_MODE, USB_I2CMODE, USB_SPIMODE }; 
 static int mode = SPI_MODE;
 
 static const char *device = "/dev/spidev0.0";
@@ -72,14 +72,14 @@ static void pabort(const char *s)
   exit(1);
 }
 
-void dump_buffer (char *buf, int n)
+void dump_buffer (unsigned char *buf, int n)
 {
   int i;
   for (i=0;i<n;i++) 
     printf (" %02x", buf[i]);
 }
 
-void dump_buf (char *t, char *buf, int n)
+void dump_buf (char *t, unsigned char *buf, int n)
 {
   printf ("%s", t);
   dump_buffer (buf, n);
@@ -88,7 +88,7 @@ void dump_buf (char *t, char *buf, int n)
 
 
 
-static void spi_txrx (int fd, char *buf, int tlen, int rlen)
+static void spi_txrx (int fd, unsigned char *buf, int tlen, int rlen)
 {
   int ret;
   struct spi_ioc_transfer tr = {
@@ -110,7 +110,7 @@ static void spi_txrx (int fd, char *buf, int tlen, int rlen)
 }
 
 
-static void i2c_txrx (int fd, char *buf, int tlen, int rlen)
+static void i2c_txrx (int fd, unsigned char *buf, int tlen, int rlen)
 {
    static int slave = -1;
 
@@ -129,25 +129,113 @@ static void i2c_txrx (int fd, char *buf, int tlen, int rlen)
 }
 
 
-static void transfer(int fd, char *buf, int tlen, int rlen)
+int myread (int fd, unsigned char *buf, int len)
+{
+  int nr, cr;
+
+  nr = 0;
+  while (nr < len) {
+    cr = read (fd,  buf+nr, len-nr);
+    if (cr < 0) return nr?nr:cr;
+    nr += cr;
+  }
+  return nr;
+}
+
+
+static void usb_spitxrx (int fd, unsigned char *buf, int tlen, int rlen)
+{
+  //   static int slave = -1;
+   static char cmd[] = {1, 1, 0 };
+
+   cmd[2] = tlen + rlen; 
+
+   if (write (fd, cmd, 3) != 3) {
+     pabort ("can't write USB cmd");
+   }
+   if (write (fd, buf, tlen+rlen) != tlen+rlen) {
+     pabort ("can't write USB buf");
+   }
+
+   //XXX: check return code. 
+   if (myread (fd, buf, 2) != 2) {
+     pabort ("can't read USB");
+   }
+
+   if (buf[0] != 0x81)
+     pabort ("invalid response code from USB");
+
+   if (buf[1] != tlen+rlen)
+     pabort ("invalid lenght code from USB");
+
+   if (myread (fd, buf, tlen+rlen) != tlen+rlen) 
+     pabort ("can't read USB");
+}
+
+
+
+static void usb_i2ctxrx (int fd, unsigned char *buf, int tlen, int rlen)
+{
+  //   static int slave = -1;
+  static char cmd[] = {1, 2, 0,0 };
+  
+  cmd[1] = 2; // I2C txrx
+  cmd[2] = tlen+1;
+  cmd[3] = rlen;
+  
+  if (write (fd, cmd, 4) != 4) {
+    pabort ("can't write USB cmd");
+  }
+  if (write (fd, buf, tlen) != tlen) {
+    pabort ("can't write USB buf");
+  }
+
+  if (myread (fd, buf, 3) != 3) {
+    pabort ("can't read USB");
+  }
+
+  //  printf ("buf[] = %02x %02x %02x\n", buf[0], buf[1], buf[2]);
+
+  if (buf[0] != 0x82)
+    pabort ("invalid response code from USB");
+
+  if (buf[1] != rlen+1)
+    pabort ("i2c rlen incorrect");
+
+  if (buf[2] != 0)
+    pabort ("i2c transaction failed");
+
+  if (myread (fd, buf+tlen, rlen) != rlen) 
+    pabort ("can't read USB");
+}
+
+
+static void transfer(int fd, unsigned char *buf, int tlen, int rlen)
 {
   if (debug & DEBUG_TRANSFER) 
     dump_buf ("Before tx:", buf, tlen);
   if (mode == SPI_MODE) 
-     spi_txrx (fd, buf, tlen, rlen);
-  else
-     i2c_txrx (fd, buf, tlen, rlen);
+    spi_txrx (fd, buf, tlen, rlen);
+  else if (mode == I2C_MODE) 
+    i2c_txrx (fd, buf, tlen, rlen);
+  else if (mode == USB_SPIMODE)
+    usb_spitxrx (fd, buf, tlen, rlen);
+  else if (mode == USB_I2CMODE)
+    usb_i2ctxrx (fd, buf, tlen, rlen);
+  else 
+    pabort ("invalid mode...\n");
+
   if (debug & DEBUG_TRANSFER) 
     dump_buf ("rx:", buf, tlen+rlen);
 }
 
 
-static void send_text (int fd, char *str) 
+static void send_text (int fd, unsigned char *str) 
 {
-  char *buf; 
+  unsigned char *buf; 
   int l;
 
-  l = strlen (str);
+  l = strlen ((char*)str);
   buf = malloc (l + 5); 
   buf[0] = addr;
   if (reg <= 0)
@@ -156,8 +244,8 @@ static void send_text (int fd, char *str)
     buf [1] = reg; 
     l++;
   }
-  strcpy (buf+2, str); 
-  strcat (buf+2, "\xff\0"); // always append the 0xff, but it won't be sent if reg = 0;
+  strcpy ((char *)buf+2, (char*)str); 
+  strcat ((char *)buf+2, "\xff\0"); // always append the 0xff, but it won't be sent if reg = 0;
   transfer (fd, buf, l+2, 0);
   free (buf);
 }
@@ -165,7 +253,7 @@ static void send_text (int fd, char *str)
 
 static void set_reg_value8 (int fd, int reg, int val)
 {
-  char buf[5]; 
+  unsigned char buf[5]; 
 
   buf[0] = addr;
   buf[1] = reg;
@@ -177,7 +265,7 @@ static void set_reg_value8 (int fd, int reg, int val)
 
 static void set_reg_value16 (int fd, int reg, int val)
 {
-  char buf[5]; 
+  unsigned char buf[5]; 
 
   buf[0] = addr;
   buf[1] = reg;
@@ -188,7 +276,7 @@ static void set_reg_value16 (int fd, int reg, int val)
 
 static void set_reg_value32 (int fd, int reg, int val)
 {
-  char buf[15]; 
+  unsigned char buf[15]; 
 
   buf[0] = addr;
   buf[1] = reg;
@@ -202,7 +290,7 @@ static void set_reg_value32 (int fd, int reg, int val)
 
 static void set_reg_value64 (int fd, int reg, long long val)
 {
-  char buf[15]; 
+  unsigned char buf[15]; 
 
   buf[0] = addr;
   buf[1] = reg;
@@ -220,7 +308,7 @@ static void set_reg_value64 (int fd, int reg, long long val)
 
 static int get_reg_value8 (int fd, int reg)
 {
-  char buf[5]; 
+  unsigned char buf[5]; 
 
   buf[0] = addr | 1;
   buf[1] = reg;
@@ -232,7 +320,7 @@ static int get_reg_value8 (int fd, int reg)
 
 static int get_reg_value16 (int fd, int reg)
 {
-  char buf[5]; 
+  unsigned char buf[5]; 
 
   buf[0] = addr | 1;
   buf[1] = reg;
@@ -244,7 +332,7 @@ static int get_reg_value16 (int fd, int reg)
 
 static int get_reg_value32 (int fd, int reg)
 {
-  char buf[10]; 
+  unsigned char buf[10]; 
 
   buf[0] = addr | 1;
   buf[1] = reg;
@@ -255,7 +343,7 @@ static int get_reg_value32 (int fd, int reg)
 
 static long long get_reg_value64 (int fd, int reg)
 {
-  char buf[10]; 
+  unsigned char buf[10]; 
   unsigned int t, tt; 
 
   buf[0] = addr | 1;
@@ -269,7 +357,7 @@ static long long get_reg_value64 (int fd, int reg)
 
 static void do_ident (int fd)
 {
-  char buf[0x20];
+  unsigned char buf[0x20];
   int i;
 
   buf [0] = addr | 1;
@@ -288,7 +376,7 @@ static void do_ident (int fd)
 static void do_readee (int fd)
 {
 #define EELEN 0x80
-  char buf[EELEN];
+  unsigned char buf[EELEN];
   int i;
 
   buf [0] = addr | 1;
@@ -315,7 +403,7 @@ char mkprintable (char ch)
 
 static void do_scan (int fd)
 {
-  char buf[0x20];
+  unsigned char buf[0x20];
   int add;
   int i;
 
@@ -355,6 +443,7 @@ static void print_usage(const char *prog)
        "  -S --scan     Scan the bus for devices \n"
        "  -R --read     multi-datasize read\n"
        "  -I --i2c      I2C mode (uses /dev/i2c-0, change with -D)\n"
+       "  -U --usb      USB mode (uses /dev/ttyACM0, change with -D)\n"
        "  -1 --decimal  Numbers are decimal. (registers remain in hex)\n"
   );
 
@@ -387,6 +476,8 @@ static const struct option lopts[] = {
   { "hex",       0, 0, 'h' },
 
   { "i2c",       0, 0, 'I' },
+  { "usbspi",    0, 0, 'u' },
+  { "usbi2c",    0, 0, 'U' },
   { "decimal",   0, 0, '1' },
 
   { "verbose",   1, 0, 'V' },
@@ -401,7 +492,7 @@ static int parse_opts(int argc, char *argv[])
   while (1) {
     int c;
 
-    c = getopt_long(argc, argv, "D:s:d:r:v:a:wWietCm:I1SRV:", lopts, NULL);
+    c = getopt_long(argc, argv, "D:s:d:r:v:a:wWietCm:I1SRUuV:", lopts, NULL);
 
     if (c == -1)
       break;
@@ -473,6 +564,16 @@ static int parse_opts(int argc, char *argv[])
 
     case 'm':
       monitor_file = strdup (optarg);
+      break;
+
+    case 'u':
+      mode=USB_SPIMODE;
+      device = "/dev/ttyACM0";
+      break;
+
+    case 'U':
+      mode=USB_I2CMODE;
+      device = "/dev/ttyACM0";
       break;
 
     case '?':
@@ -553,9 +654,9 @@ void wait_for_file_changed (char *fname)
 }
 
 
-char *get_file_line (char *fname, int lno)
+unsigned char *get_file_line (char *fname, int lno)
 {
-  static char buf[0x50], *p;
+  static unsigned char buf[0x50], *p;
   FILE *f;
   int i;
 
@@ -564,12 +665,12 @@ char *get_file_line (char *fname, int lno)
   if (!f) pabort (fname);
   for (i = 0;i<=lno;i++) {
     buf [0] = 0;
-    p = fgets (buf, 0x3f, f);
+    p = (unsigned char*)fgets ((char*)buf, 0x3f, f);
     if (!p) return p;
   }
 
   fclose (f);
-  buf[strlen(buf)-1] = 0; // chop!
+  buf[strlen((char*)buf)-1] = 0; // chop!
   return buf;
 }
 
@@ -577,7 +678,7 @@ char *get_file_line (char *fname, int lno)
 void do_monitor_file (int fd, char *fname)
 {
   int i;
-  char *buf;
+  unsigned char *buf;
   char olddisplay[4][0x20];
 
   //fprintf (stderr, "monitoring %s on fd %d.\n", fname, fd);
@@ -587,10 +688,10 @@ void do_monitor_file (int fd, char *fname)
     for (i=0;i<4;i++) {
       buf = get_file_line (fname, i);
       if (!buf) break;
-      while (strlen (buf) < 20) strcat (buf, "    ");
+      while (strlen ((char*)buf) < 20) strcat ((char*)buf, "    ");
       buf[20] = 0;
-      if (strcmp (buf, olddisplay[i])) { 
-        strcpy (olddisplay[i], buf);
+      if (strcmp ((char*)buf, olddisplay[i])) { 
+        strcpy (olddisplay[i], (char *)buf);
         set_reg_value8 (fd, 0x11, i<<5);
         send_text (fd, buf);
         usleep (50000);
@@ -605,7 +706,7 @@ int main(int argc, char *argv[])
 {
   int fd;
   int nonoptions;
-  char buf[0x100];
+  unsigned char buf[0x100];
   int i, rv;
   char typech;
   char format[32];
@@ -713,7 +814,7 @@ int main(int argc, char *argv[])
 
 
   if (hexmode) {
-    char buf[0x400];
+    unsigned char buf[0x400];
     int l, v;
 
     l = argc - nonoptions; 
@@ -736,8 +837,8 @@ int main(int argc, char *argv[])
   if (text) {
     buf [0] = 0;
     for (i=nonoptions; i < argc;i++) {
-      if (i != nonoptions) strcat (buf, " ");
-      strcat (buf, argv[i]);
+      if (i != nonoptions) strcat ((char*)buf, " ");
+      strcat ((char*)buf, argv[i]);
     }
     send_text (fd, buf);
     exit (0);
