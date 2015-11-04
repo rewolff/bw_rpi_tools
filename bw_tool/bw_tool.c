@@ -146,7 +146,7 @@ int myread (int fd, unsigned char *buf, int len)
 static void usb_spitxrx (int fd, unsigned char *buf, int tlen, int rlen)
 {
   //   static int slave = -1;
-   static char cmd[] = {1, 1, 0 };
+   static char cmd[] = {0x01, 0x10, 0 };
 
    cmd[2] = tlen + rlen; 
 
@@ -162,7 +162,7 @@ static void usb_spitxrx (int fd, unsigned char *buf, int tlen, int rlen)
      pabort ("can't read USB");
    }
 
-   if (buf[0] != 0x81)
+   if (buf[0] != 0x90)
      pabort ("invalid response code from USB");
 
    if (buf[1] != tlen+rlen)
