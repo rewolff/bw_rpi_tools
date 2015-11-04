@@ -326,7 +326,7 @@ static int get_reg_value16 (int fd, int reg)
   buf[1] = reg;
   transfer (fd, buf, 2, 2);
   //dump_buffer (buf, 5);
-  return buf[2] | (buf[3] << 8);
+  return buf[3] | (buf[2] << 8);
 }
 
 
@@ -338,7 +338,7 @@ static int get_reg_value32 (int fd, int reg)
   buf[1] = reg;
   transfer (fd, buf, 2, 4);
   //dump_buffer (buf, 5);
-  return buf[2] | (buf[3] << 8) | (buf[4] << 16) | (buf[5] << 24);
+  return buf[5] | (buf[4] << 8) | (buf[3] << 16) | (buf[2] << 24);
 }
 
 static long long get_reg_value64 (int fd, int reg)
@@ -349,9 +349,9 @@ static long long get_reg_value64 (int fd, int reg)
   buf[0] = addr | 1;
   buf[1] = reg;
   transfer (fd, buf, 2, 8);
-  t  = buf[2] | (buf[3] << 8) | (buf[4] << 16) | (buf[5] << 24);
-  tt = buf[6] | (buf[7] << 8) | (buf[8] << 16) | (buf[9] << 24);
-  return ((long long) tt << 32)  | t;
+  t  = buf[9] | (buf[8] << 8) | (buf[7] << 16) | (buf[6] << 24);
+  tt = buf[5] | (buf[4] << 8) | (buf[3] << 16) | (buf[2] << 24);
+  return t | ((long long) tt << 32);
 }
 
 
