@@ -306,7 +306,7 @@ static void set_reg_value64 (int fd, int reg, long long val)
 }
 
 
-static int get_reg_value8 (int fd, int reg)
+static unsigned int get_reg_value8 (int fd, int reg)
 {
   unsigned char buf[5]; 
 
@@ -318,7 +318,7 @@ static int get_reg_value8 (int fd, int reg)
 }
 
 
-static int get_reg_value16 (int fd, int reg)
+static unsigned int get_reg_value16 (int fd, int reg)
 {
   unsigned char buf[5]; 
 
@@ -330,7 +330,7 @@ static int get_reg_value16 (int fd, int reg)
 }
 
 
-static int get_reg_value32 (int fd, int reg)
+static unsigned int get_reg_value32 (int fd, int reg)
 {
   unsigned char buf[10]; 
 
