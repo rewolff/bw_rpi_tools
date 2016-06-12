@@ -2,10 +2,11 @@
 CFLAGS=-Wall -O2
 CC=gcc 
 
-all: bw_tool
+MYBIN=bw_tool
+all: $(MYBIN)
 
-install: bw_tool
-	cp bw_tool /usr/bin
+install: $(MYBIN)
+	cp $(MYBIN) /usr/bin
 
 clean:
 	rm -f *~ *.o
