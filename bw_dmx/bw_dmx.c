@@ -58,13 +58,13 @@ static uint8_t spi_mode;
 static uint8_t bits = 8;
 static uint32_t speed = 6000000;
 static int delay = 0;
-static int wait = 25000;
+static int wait = 22000;
 static int addr = 0x82;
 static int text = 0;
 static char *monitor_file;
 static int readmode = 0;
 
-static int reg = -1;
+//static int reg = -1;
 static long long val = -1;
 static int cls = 0;
 static int write8mode, writemiscmode, ident, readee;
@@ -727,6 +727,7 @@ int main(int argc, char *argv[])
 {
   int fd;
   int nonoptions;
+  int last; 
 //  int i, rv;
 //  char typech;
 //  char format[32];
@@ -759,6 +760,7 @@ int main(int argc, char *argv[])
   data = mmap (NULL, 0x200, PROT_READ | PROT_WRITE, MAP_SHARED, infd, 0);
   //  printf ("data=%p.\n", data);
   //dmxmode = DMX_TX;
+  last = -1;
   while (1) {
     if (dmxmode == DMX_TX) {
        spibuf.cmd = CMD_DMXDATA;
@@ -773,8 +775,9 @@ int main(int argc, char *argv[])
     transfer (fd, (void*) &spibuf, 0x209, 0); 
 
     if (dmxmode == DMX_RX) {
-       if (spibuf.cmd == STAT_RXOK) {
+       if (spibuf.param != last) {
           memcpy (data, spibuf.dmxbuf, 0x200);
+          last = spibuf.param;
        } else {
           if (spibuf.cmd == STAT_RX_IN_PROGRESS) {
              usleep (1000);

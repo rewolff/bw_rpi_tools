@@ -37,7 +37,7 @@ enum spi_cmd_t { CMD_DMXDATA=0x1234,
 		 CMD_IDLE, 
 		 CMD_READ_DMX, // 0x123a
 		 STAT_NODATA,  // 0x123b
-		 STAT_RX_IN_PROGRESS //3c
+		 STAT_RX_IN_PROGRESS, //3c
 		 STAT_RXDONE,  // 0x123d
 		 STAT_RXOK,    // 0x123e
 		 STAT_TX_ACTIVE,
