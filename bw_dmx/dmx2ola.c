@@ -1,5 +1,5 @@
 /*
- * bw_dmx.c. 
+ * dmx2ola.c. 
  *
  * Control the BitWizard SPI and I2C expansion boards on
  * Linux computers with spidev or i2c-dev. 
@@ -19,7 +19,7 @@
  *
  * Compile on raspberry pi with 
  *
- * gcc -Wall -O2 bw_dmx.c -o bw_dmx
+ * gcc -Wall -O2 dmx2ola.c -o dmx2ola
  *
  * or with the included Makefile (type "make"). 
  */
@@ -48,7 +48,7 @@
 
 
 struct spi_txrx spibuf;
-static enum mode_t dmxmode = DMX_TX;
+//static enum mode_t dmxmode = DMX_TX;
 
 enum {SPI_MODE = 1, I2C_MODE, USB_I2CMODE, USB_SPIMODE }; 
 static int mode = SPI_MODE;
@@ -56,21 +56,26 @@ static int mode = SPI_MODE;
 static const char *device = "/dev/spidev0.0";
 static uint8_t spi_mode;
 static uint8_t bits = 8;
+
 static uint32_t speed = 6000000;
 static int delay = 0;
 static int wait = 22000;
-static int addr = 0x82;
-static int text = 0;
-static char *monitor_file;
-static int readmode = 0;
+
+//static int addr = 0x82;
+//static int text = 0;
+//static char *monitor_file;
+//static int readmode = 0;
 
 //static int reg = -1;
-static long long val = -1;
-static int cls = 0;
-static int write8mode, writemiscmode, ident, readee;
-static int scan = 0;
-static int hexmode = 0;
-static char numberformat = 'x';
+//static long long val = -1;
+//static int cls = 0;
+//static int write8mode, writemiscmode, ident, readee;
+//static int scan = 0;
+//static int hexmode = 0;
+//static char numberformat = 'x';
+
+static int universe = 0;
+
 
 static int debug = 0;
 #define DEBUG_REGSETTING 0x0001
@@ -241,171 +246,6 @@ static void transfer(int fd, unsigned char *buf, int tlen, int rlen)
 }
 
 
-#if 0
-static void send_text (int fd, unsigned char *str) 
-{
-  unsigned char *buf; 
-  int l;
-
-  l = strlen ((char*)str);
-  buf = malloc (l + 5); 
-  buf[0] = addr;
-  if (reg <= 0)
-    buf [1] = 0; 
-  else {
-    buf [1] = reg; 
-    l++;
-  }
-  strcpy ((char *)buf+2, (char*)str); 
-  strcat ((char *)buf+2, "\xff\0"); // always append the 0xff, but it won't be sent if reg = 0;
-  transfer (fd, buf, l+2, 0);
-  free (buf);
-}
-
-
-static void set_reg_value8 (int fd, int reg, int val)
-{
-  unsigned char buf[5]; 
-
-  buf[0] = addr;
-  buf[1] = reg;
-  buf[2] = val;
-  transfer (fd, buf, 3, 0);
-}
-
-
-
-static void set_reg_value16 (int fd, int reg, int val)
-{
-  unsigned char buf[5]; 
-
-  buf[0] = addr;
-  buf[1] = reg;
-  buf[2] = val;
-  buf[3] = val >> 8;
-  transfer (fd, buf, 4, 0);
-}
-
-static void set_reg_value32 (int fd, int reg, int val)
-{
-  unsigned char buf[15]; 
-
-  buf[0] = addr;
-  buf[1] = reg;
-  buf[2] = val;
-  buf[3] = val >> 8;
-  buf[4] = val >> 16;
-  buf[5] = val >> 24;
-  transfer (fd, buf, 6, 0);
-}
-
-
-static void set_reg_value64 (int fd, int reg, long long val)
-{
-  unsigned char buf[15]; 
-
-  buf[0] = addr;
-  buf[1] = reg;
-  buf[2] = val;
-  buf[3] = val >> 8;
-  buf[4] = val >> 16;
-  buf[5] = val >> 24;
-  buf[6] = val >> 32;
-  buf[7] = val >> 40;
-  buf[8] = val >> 48;
-  buf[9] = val >> 56;
-  transfer (fd, buf, 10, 0);
-}
-
-
-static unsigned int get_reg_value8 (int fd, int reg)
-{
-  unsigned char buf[5]; 
-
-  buf[0] = addr | 1;
-  buf[1] = reg;
-  transfer (fd, buf, 2, 1);
-  //dump_buffer (buf, 5);
-  return buf[2];
-}
-
-
-static unsigned int get_reg_value16 (int fd, int reg)
-{
-  unsigned char buf[5]; 
-
-  buf[0] = addr | 1;
-  buf[1] = reg;
-  transfer (fd, buf, 2, 2);
-  //dump_buffer (buf, 5);
-  return buf[2] | (buf[3] << 8);
-}
-
-
-static unsigned int get_reg_value32 (int fd, int reg)
-{
-  unsigned char buf[10]; 
-
-  buf[0] = addr | 1;
-  buf[1] = reg;
-  transfer (fd, buf, 2, 4);
-  //dump_buffer (buf, 5);
-  return buf[2] | (buf[3] << 8) | (buf[4] << 16) | (buf[5] << 24);
-}
-
-static long long get_reg_value64 (int fd, int reg)
-{
-  unsigned char buf[10]; 
-  unsigned int t, tt; 
-
-  buf[0] = addr | 1;
-  buf[1] = reg;
-  transfer (fd, buf, 2, 8);
-  t  = buf[2] | (buf[3] << 8) | (buf[4] << 16) | (buf[5] << 24);
-  tt = buf[6] | (buf[7] << 8) | (buf[8] << 16) | (buf[9] << 24);
-  return ((long long) tt << 32)  | t;
-}
-
-
-static void do_ident (int fd)
-{
-  unsigned char buf[0x20];
-  int i;
-
-  buf [0] = addr | 1;
-  buf [1] = 1;
-
-  transfer (fd, buf, 0x2,0x20);
-
-  for (i= 2 ;i<0x20;i++) {
-    if (!buf[i]) break;
-    putchar (buf[i]);
-  }
-  putchar ('\n');
-}
-
-
-static void do_readee (int fd)
-{
-#define EELEN 0x80
-  unsigned char buf[EELEN];
-  int i;
-
-  buf [0] = addr | 1;
-  buf [1] = 2;
-
-  transfer (fd, buf, 0x2, 0x80);
-
-  for (i = 0;i < EELEN;i++) {
-    if (!(i & 0xf)) printf ("\n%04x:  ", i); 
-    printf ("%02x ", ((unsigned char *) buf)[i+2]);
-
-  }
-  printf ("\n");
-}
-
-
-#endif
 
 char mkprintable (char ch)
 {
@@ -414,35 +254,6 @@ char mkprintable (char ch)
   return '.';
 }
 
-
-#if 0
-
-static void do_scan (int fd)
-{
-  unsigned char buf[0x20];
-  int add;
-  int i;
-
-  for (add = 0;add < 255;add += 2) {
-    buf[0] = add | 1;
-    buf[1] = 1;
-    transfer (fd, buf, 0x2, 0x20);
-    for (i=(mode==I2C_MODE)?0:2;i<0x20;i++) {
-      if (mkprintable (buf[i]) != '.') break;
-    }
-    if (i != 0x20) {
-      printf ("%02x: ", add);
-      for (i=(mode==I2C_MODE)?0:2;i<0x20;i++) {
-	if (buf[i] == 0) break;
-	putchar (mkprintable (buf[i]));
-      }
-      printf ("\n");
-    }
-  }
-
-}
-
-#endif
 
 
 static void print_usage(const char *prog)
@@ -474,30 +285,8 @@ static const struct option lopts[] = {
   { "speed",   1, 0, 's' },
   { "delay",   1, 0, 'd' },
 
-  { "rx",        0, 0, 'r' },
-  { "val",       1, 0, 'v' },
-  { "addr",      1, 0, 'a' },
-  { "write8",    0, 0, 'w' },
-  { "write",     0, 0, 'W' },
-  { "interval",  1, 0, 'i' },
-  { "scan",      0, 0, 'S' },
-  { "read",      0, 0, 'R' },
-  { "eeprom",    0, 0, 'e' },
+  { "universe",  1, 0, 'u' },
 
-
-  // Options for LCD
-  { "text",      0, 0, 't' },
-  { "cls",       0, 0, 'C' },
-  { "monitor",   1, 0, 'm' },
-
-  { "hex",       0, 0, 'h' },
-
-  { "i2c",       0, 0, 'I' },
-  { "usbspi",    0, 0, 'u' },
-  { "usbi2c",    0, 0, 'U' },
-  { "decimal",   0, 0, '1' },
-
-  { "verbose",   1, 0, 'V' },
   { "help",      0, 0, '?' },
   { NULL, 0, 0, 0 },
 };
@@ -509,7 +298,7 @@ static int parse_opts(int argc, char *argv[])
   while (1) {
     int c;
 
-    c = getopt_long(argc, argv, "D:s:d:rv:a:wWietCm:I1SRUuV:", lopts, NULL);
+    c = getopt_long(argc, argv, "D:s:d:u:?", lopts, NULL);
 
     if (c == -1)
       break;
@@ -526,71 +315,8 @@ static int parse_opts(int argc, char *argv[])
     case 'd':
       delay = atoi(optarg);
       break;
-    case 'r':
-      dmxmode = DMX_RX;
-      break;
-    case 'v':
-      val = atoi(optarg);
-      break;
-    case 'V':
-      debug = atoi(optarg);
-      break;
-    case 'a':
-      sscanf (optarg, "%x", &addr);
-      break;
-
-    case 'e':
-      readee = 1;
-      break;
-    case 'h':
-      hexmode = 1;
-      break;
-    case 'w':
-      write8mode = 1;
-      break;
-    case 'W':
-      writemiscmode = 1;
-      break;
-    case 'R':
-      if (speed > 100000) speed = 100000;
-      readmode = 1;
-      break;
-    case 'i':
-      if (speed > 100000) speed = 100000;
-      ident = 1;
-      break;
-    case 'I':
-      mode=I2C_MODE;
-      device = "/dev/i2c-0";
-      break;
-    case 'S':
-      if (speed > 100000) speed = 100000;
-      scan=1;
-      break;  
-    case 't':
-      text = 1;
-      break;
-
-    case 'C':
-      cls = 1;
-      break;
-
-    case '1':
-      numberformat = 'd';
-      break;
-
-    case 'm':
-      monitor_file = strdup (optarg);
-      break;
-
     case 'u':
-      mode=USB_SPIMODE;
-      device = "/dev/ttyACM0";
-      break;
-
-    case 'U':
-      mode=USB_I2CMODE;
-      device = "/dev/ttyACM0";
+      universe = atoi(optarg);
       break;
 
     case '?':
@@ -726,22 +452,24 @@ void do_monitor_file (int fd, char *fname)
 int main(int argc, char *argv[])
 {
   int fd;
-  int nonoptions;
+  //int nonoptions;
   int last; 
-//  int i, rv;
-//  char typech;
-//  char format[32];
-  char *thefile;
-  int infd;
-  unsigned char *data;
+  int i;
+  char ola_streaming_cmd[0x80];
+  FILE *ola_streaming_fp;
+  //int infd;
+  unsigned char data[0x210];
   int nodata = 0;
 
+#if 0
   if (argc <= 1) {
     print_usage (argv[0]);
     exit (0);
   }
+#endif
 
-  nonoptions = parse_opts(argc, argv);
+  //  nonoptions = 
+    parse_opts(argc, argv);
 
   //fprintf (stderr, "dev = %s\n", device);
   //fprintf (stderr, "mode = %d\n", mode);
@@ -751,41 +479,37 @@ int main(int argc, char *argv[])
 
   if (mode == SPI_MODE) setup_spi_mode (fd);
 
-  thefile = argv[nonoptions];
-  infd = open (thefile, O_RDWR); 
-  if (infd < 0) {
-     perror (thefile);
-     exit (1);
+  sprintf (ola_streaming_cmd, "ola_streaming_client -u %d", universe);
+  ola_streaming_fp = popen (ola_streaming_cmd, "w");
+  if (ola_streaming_fp == NULL ) {
+    perror ("opening pipe to ola_streaming_client"); 
+    exit (1);
   }
-  data = mmap (NULL, 0x200, PROT_READ | PROT_WRITE, MAP_SHARED, infd, 0);
-  //  printf ("data=%p.\n", data);
-  //dmxmode = DMX_TX;
+  
   last = -1;
   while (1) {
-    if (dmxmode == DMX_TX) {
-       spibuf.cmd = CMD_DMXDATA;
-       memcpy (spibuf.dmxbuf, data, 0x200);
-    }
-
-    if (dmxmode == DMX_RX) {
-       spibuf.cmd = CMD_READ_DMX;
-    }
+    spibuf.cmd = CMD_READ_DMX;
 
     // transfer 8 byte header + 513 byte datablock. 
     transfer (fd, (void*) &spibuf, 0x209, 0); 
 
-    if (dmxmode == DMX_RX) {
-       if (spibuf.param != last) {
-          memcpy (data, spibuf.dmxbuf, 0x200);
-          last = spibuf.param;
-       } else {
-          if (spibuf.cmd == STAT_RX_IN_PROGRESS) {
-             usleep (1000);
-             continue;
-          }
-          printf ("no data %d\r", nodata++); 
-          fflush (stdout);
-       }
+    if (spibuf.param != last) {
+      if (memcmp (data, spibuf.dmxbuf, 0x200) != 0) {
+	memcpy (data, spibuf.dmxbuf, 0x200);
+	// The DMX data starts at offset 1. 
+	for (i=1;i<512;i++)
+	  fprintf (ola_streaming_fp, "%d,", data[i]);
+	fprintf (ola_streaming_fp, "%d\n", data[i]);
+	fflush (ola_streaming_fp);
+      }
+      last = spibuf.param;
+    } else {
+      if (spibuf.cmd == STAT_RX_IN_PROGRESS) {
+	usleep (1000);
+	continue;
+      }
+      printf ("no data %d\r", nodata++); 
+      fflush (stdout);
     }
     
     usleep (wait);
