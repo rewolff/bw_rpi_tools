@@ -460,6 +460,7 @@ int main(int argc, char *argv[])
   //int infd;
   unsigned char data[0x210];
   int nodata = 0;
+  int yesdata = 0;
 
 #if 0
   if (argc <= 1) {
@@ -503,12 +504,14 @@ int main(int argc, char *argv[])
 	fflush (ola_streaming_fp);
       }
       last = spibuf.param;
+      printf ("data/nodata %d/%d \r", yesdata++, nodata); 
+      fflush (stdout);
     } else {
       if (spibuf.cmd == STAT_RX_IN_PROGRESS) {
 	usleep (1000);
 	continue;
       }
-      printf ("no data %d\r", nodata++); 
+      printf ("data/nodata %d/%d \r", yesdata, nodata++); 
       fflush (stdout);
     }
     
