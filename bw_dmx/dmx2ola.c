@@ -60,20 +60,6 @@ static uint8_t bits = 8;
 static uint32_t speed = 6000000;
 static int delay = 0;
 static int wait = 22000;
-
-//static int addr = 0x82;
-//static int text = 0;
-//static char *monitor_file;
-//static int readmode = 0;
-
-//static int reg = -1;
-//static long long val = -1;
-//static int cls = 0;
-//static int write8mode, writemiscmode, ident, readee;
-//static int scan = 0;
-//static int hexmode = 0;
-//static char numberformat = 'x';
-
 static int universe = 0;
 
 
@@ -377,78 +363,6 @@ void setup_spi_mode (int fd)
 
 
 
-#if 0
-void wait_for_file_changed (char *fname)
-{
-  static time_t lastmtime = 0;
-  struct stat statb;
-
-  while (1) {
-    if (stat (fname, &statb) < 0) {
-      pabort (fname);
-    }
-
-    if (lastmtime != statb.st_mtime) {
-      //printf ("fc: %x / %x\n", (int) lastmtime, (int) statb.st_mtime);
-      lastmtime = statb.st_mtime;
-      return;
-    }
-    usleep (250000);
-  }
-}
-
-
-unsigned char *get_file_line (char *fname, int lno)
-{
-  static unsigned char buf[0x50], *p;
-  FILE *f;
-  int i;
-
-
-  f = fopen (fname, "r");
-  if (!f) pabort (fname);
-  for (i = 0;i<=lno;i++) {
-    buf [0] = 0;
-    p = (unsigned char*)fgets ((char*)buf, 0x3f, f);
-    if (!p) return p;
-  }
-
-  fclose (f);
-  buf[strlen((char*)buf)-1] = 0; // chop!
-  return buf;
-}
-
-
-void do_monitor_file (int fd, char *fname)
-{
-  int i;
-  unsigned char *buf;
-  char olddisplay[4][0x20];
-
-  //fprintf (stderr, "monitoring %s on fd %d.\n", fname, fd);
-  while (1) {
-    wait_for_file_changed (fname);
-    //set_reg_value8 (fd, 0x10, 0xaa);
-    for (i=0;i<4;i++) {
-      buf = get_file_line (fname, i);
-      if (!buf) break;
-      while (strlen ((char*)buf) < 20) strcat ((char*)buf, "    ");
-      buf[20] = 0;
-      if (strcmp ((char*)buf, olddisplay[i])) { 
-        strcpy (olddisplay[i], (char *)buf);
-        set_reg_value8 (fd, 0x11, i<<5);
-        send_text (fd, buf);
-        usleep (50000);
-      }
-    }
-  }
-}
-
-#endif
-
-
-
-
 int main(int argc, char *argv[])
 {
   int fd;
@@ -470,10 +384,11 @@ int main(int argc, char *argv[])
 #endif
 
   //  nonoptions = 
-    parse_opts(argc, argv);
+  parse_opts(argc, argv);
 
   //fprintf (stderr, "dev = %s\n", device);
   //fprintf (stderr, "mode = %d\n", mode);
+
   fd = open(device, O_RDWR);
   if (fd < 0)
     pabort("can't open device");
