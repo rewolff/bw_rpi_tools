@@ -233,15 +233,6 @@ static void transfer(int fd, unsigned char *buf, int tlen, int rlen)
 
 
 
-char mkprintable (char ch)
-{
-  if (ch < ' ') return '.';
-  if (ch <= '~') return ch;
-  return '.';
-}
-
-
-
 static void print_usage(const char *prog)
 {
   printf("Usage: %s [-DsbdlHOLC3]\n", prog);
