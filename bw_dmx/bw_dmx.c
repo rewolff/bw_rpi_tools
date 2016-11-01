@@ -694,6 +694,13 @@ int main(int argc, char *argv[])
 
   if (mode == SPI_MODE) setup_spi_mode (fd);
 
+  if (dmxmode == DMX_IDLE) {
+    spibuf.cmd = CMD_IDLE;
+    transfer (fd, (void*) &spibuf, 0x209, 0); 
+    exit (0);
+  }   
+    
+
   thefile = argv[nonoptions];
   infd = open (thefile, O_RDWR); 
   if (infd < 0) {
@@ -701,8 +708,9 @@ int main(int argc, char *argv[])
      exit (1);
   }
   data = mmap (NULL, 0x200, PROT_READ | PROT_WRITE, MAP_SHARED, infd, 0);
-  //  printf ("data=%p.\n", data);
-  //dmxmode = DMX_TX;
+
+
+
   last = -1;
   while (1) {
     if (dmxmode == DMX_TX) {
