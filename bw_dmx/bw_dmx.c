@@ -59,18 +59,18 @@ static uint8_t bits = 8;
 static uint32_t speed = 6000000;
 static int delay = 0;
 static int wait = 22000;
-static int addr = 0x82;
-static int text = 0;
-static char *monitor_file;
-static int readmode = 0;
+//static int addr = 0x82;
+//static int text = 0;
+//static char *monitor_file;
+//static int readmode = 0;
 
 //static int reg = -1;
-static long long val = -1;
-static int cls = 0;
-static int write8mode, writemiscmode, ident, readee;
-static int scan = 0;
-static int hexmode = 0;
-static char numberformat = 'x';
+//static long long val = -1;
+//static int cls = 0;
+//static int write8mode, writemiscmode, ident, readee;
+//static int scan = 0;
+//static int hexmode = 0;
+//static char numberformat = 'x';
 
 static int debug = 0;
 #define DEBUG_REGSETTING 0x0001
@@ -474,28 +474,28 @@ static const struct option lopts[] = {
   { "speed",   1, 0, 's' },
   { "delay",   1, 0, 'd' },
 
+  { "idle",      0, 0, 'i' },
   { "rx",        0, 0, 'r' },
-  { "val",       1, 0, 'v' },
-  { "addr",      1, 0, 'a' },
-  { "write8",    0, 0, 'w' },
-  { "write",     0, 0, 'W' },
-  { "interval",  1, 0, 'i' },
-  { "scan",      0, 0, 'S' },
-  { "read",      0, 0, 'R' },
-  { "eeprom",    0, 0, 'e' },
+  // { "addr",      1, 0, 'a' },
+  // { "write8",    0, 0, 'w' },
+  // { "write",     0, 0, 'W' },
+  //{ "interval",  1, 0, 'i' },
+  //{ "scan",      0, 0, 'S' },
+  //{ "read",      0, 0, 'R' },
+  //{ "eeprom",    0, 0, 'e' },
 
 
   // Options for LCD
-  { "text",      0, 0, 't' },
-  { "cls",       0, 0, 'C' },
-  { "monitor",   1, 0, 'm' },
+  //{ "text",      0, 0, 't' },
+  //{ "cls",       0, 0, 'C' },
+  //{ "monitor",   1, 0, 'm' },
 
-  { "hex",       0, 0, 'h' },
+  //{ "hex",       0, 0, 'h' },
 
-  { "i2c",       0, 0, 'I' },
-  { "usbspi",    0, 0, 'u' },
-  { "usbi2c",    0, 0, 'U' },
-  { "decimal",   0, 0, '1' },
+  //{ "i2c",       0, 0, 'I' },
+  //{ "usbspi",    0, 0, 'u' },
+  //{ "usbi2c",    0, 0, 'U' },
+  //{ "decimal",   0, 0, '1' },
 
   { "verbose",   1, 0, 'V' },
   { "help",      0, 0, '?' },
@@ -509,7 +509,7 @@ static int parse_opts(int argc, char *argv[])
   while (1) {
     int c;
 
-    c = getopt_long(argc, argv, "D:s:d:rv:a:wWietCm:I1SRUuV:", lopts, NULL);
+    c = getopt_long(argc, argv, "D:s:d:rV:i", lopts, NULL);
 
     if (c == -1)
       break;
@@ -529,68 +529,11 @@ static int parse_opts(int argc, char *argv[])
     case 'r':
       dmxmode = DMX_RX;
       break;
-    case 'v':
-      val = atoi(optarg);
-      break;
     case 'V':
       debug = atoi(optarg);
       break;
-    case 'a':
-      sscanf (optarg, "%x", &addr);
-      break;
-
-    case 'e':
-      readee = 1;
-      break;
-    case 'h':
-      hexmode = 1;
-      break;
-    case 'w':
-      write8mode = 1;
-      break;
-    case 'W':
-      writemiscmode = 1;
-      break;
-    case 'R':
-      if (speed > 100000) speed = 100000;
-      readmode = 1;
-      break;
     case 'i':
-      if (speed > 100000) speed = 100000;
-      ident = 1;
-      break;
-    case 'I':
-      mode=I2C_MODE;
-      device = "/dev/i2c-0";
-      break;
-    case 'S':
-      if (speed > 100000) speed = 100000;
-      scan=1;
-      break;  
-    case 't':
-      text = 1;
-      break;
-
-    case 'C':
-      cls = 1;
-      break;
-
-    case '1':
-      numberformat = 'd';
-      break;
-
-    case 'm':
-      monitor_file = strdup (optarg);
-      break;
-
-    case 'u':
-      mode=USB_SPIMODE;
-      device = "/dev/ttyACM0";
-      break;
-
-    case 'U':
-      mode=USB_I2CMODE;
-      device = "/dev/ttyACM0";
+      dmxmode = DMX_IDLE;
       break;
 
     case '?':

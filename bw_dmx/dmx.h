@@ -25,7 +25,7 @@ struct config {
 } config;
 
 
-enum mode_t { IDLE, DMX_TX, DMX_RX};
+enum mode_t { DMX_IDLE, DMX_TX, DMX_RX};
 
 
 /* ******************** the protocol *******************************/
