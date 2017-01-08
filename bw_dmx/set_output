@@ -1,0 +1,7 @@
+#!/bin/sh
+start=$1
+shift
+val="$*"
+THE_DMX_FILE=dmxfile
+makechar $val | dd of=$THE_DMX_FILE conv=notrunc bs=1 seek=$start 2> /dev/null
+
