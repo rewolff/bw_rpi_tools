@@ -38,13 +38,16 @@
 #include <linux/spi/spidev.h>
 #include <linux/i2c-dev.h>
 
+
+#include "usb_protocol.h"
+
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
 
-enum {SPI_MODE = 1, I2C_MODE, USB_I2CMODE, USB_SPIMODE }; 
-static int mode = SPI_MODE;
+enum {MODE_NONE = -1, SPI_MODE = 1, I2C_MODE, USB_I2CMODE, USB_SPIMODE }; 
+static int mode = MODE_NONE;
 
-static const char *device = "/dev/spidev0.0";
+static const char *device = NULL; // = "/dev/spidev0.0";
 static uint8_t spi_mode;
 static uint8_t bits = 8;
 static uint32_t speed = 240000;
@@ -53,6 +56,8 @@ static int addr = 0x82;
 static int text = 0;
 static char *monitor_file;
 static int readmode = 0;
+
+static int rs485_lid = 0, rs485_rid = -1;
 
 static int reg = -1;
 static long long val = -1;
@@ -143,35 +148,56 @@ int myread (int fd, unsigned char *buf, int len)
 }
 
 
+
+
 static void usb_spitxrx (int fd, unsigned char *buf, int tlen, int rlen)
 {
+  int hdrlen;
   //   static int slave = -1;
-   static char cmd[] = {0x01, 0x10, 0 };
+  static char cmd[] = { BINSTART, 
+			USB_CMD_FWD, 0 /*Local ID */, 0 /* Len */,
+			USB_CMD_SPI_TXRX, 0 /* ID */, 0 /* Len */  };
+  
+  if (rs485_rid == -1) {
+    // Local
+    cmd[1] = USB_CMD_SPI_TXRX;
+    cmd[2] = rs485_lid;
+    cmd[3] = tlen + rlen; 
+    hdrlen = 4;
+  } else {
+    cmd[1] = USB_CMD_FWD;
+    cmd[2] = rs485_lid;
+    cmd[3] = tlen + rlen + 3; 
+    cmd[4] = USB_CMD_SPI_TXRX;
+    cmd[5] = rs485_rid;
+    cmd[6] = tlen + rlen; 
+    hdrlen = 7;
+  }
+  
+  if (write (fd, cmd, hdrlen) != hdrlen) {
+    pabort ("can't write USB cmd");
+  }
+  if (write (fd, buf, tlen+rlen) != tlen+rlen) {
+    pabort ("can't write USB buf");
+  }
 
-   cmd[2] = tlen + rlen; 
+  //XXX: check return code. 
+  if (myread (fd, buf, 4) != 4) {
+    pabort ("can't read USB");
+  }
 
-   if (write (fd, cmd, 3) != 3) {
-     pabort ("can't write USB cmd");
-   }
-   if (write (fd, buf, tlen+rlen) != tlen+rlen) {
-     pabort ("can't write USB buf");
-   }
+  if (buf[0] != BINSTART)
+    pabort ("invalid binstart code from USB");
 
-   //XXX: check return code. 
-   if (myread (fd, buf, 2) != 2) {
-     pabort ("can't read USB");
-   }
+  if (buf[1] != (USB_CMD_SPI_TXRX | USB_RESPONSE))
+    pabort ("invalid response code from USB");
 
-   if (buf[0] != 0x90)
-     pabort ("invalid response code from USB");
+  if (buf[3] != tlen+rlen)
+    pabort ("invalid length code from USB");
 
-   if (buf[1] != tlen+rlen)
-     pabort ("invalid lenght code from USB");
-
-   if (myread (fd, buf, tlen+rlen) != tlen+rlen) 
-     pabort ("can't read USB");
+  if (myread (fd, buf, tlen+rlen) != tlen+rlen) 
+    pabort ("can't read USB");
 }
-
 
 
 static void usb_i2ctxrx (int fd, unsigned char *buf, int tlen, int rlen)
@@ -480,6 +506,8 @@ static const struct option lopts[] = {
   { "usbi2c",    0, 0, 'U' },
   { "decimal",   0, 0, '1' },
 
+  { "rs485_ids", 1, 0, '4' },
+
   { "verbose",   1, 0, 'V' },
   { "help",      0, 0, '?' },
   { NULL, 0, 0, 0 },
@@ -489,10 +517,12 @@ static const struct option lopts[] = {
 
 static int parse_opts(int argc, char *argv[])
 {
+  int r;
+
   while (1) {
     int c;
 
-    c = getopt_long(argc, argv, "D:s:d:r:v:a:wWietCm:I1SRUuV:", lopts, NULL);
+    c = getopt_long(argc, argv, "D:s:d:r:v:a:wWietCm:I1SRUu4:V:", lopts, NULL);
 
     if (c == -1)
       break;
@@ -500,8 +530,10 @@ static int parse_opts(int argc, char *argv[])
     switch (c) {
     case 'D':
       device = strdup (optarg);
-      if (strstr (device, "i2c")) mode=I2C_MODE;
-      else                        mode=SPI_MODE;
+      if (mode == MODE_NONE) {
+	if (strstr (device, "i2c")) mode=I2C_MODE;
+	else                        mode=SPI_MODE;
+      }
       break;
     case 's':
       speed = atoi(optarg);
@@ -544,7 +576,8 @@ static int parse_opts(int argc, char *argv[])
       break;
     case 'I':
       mode=I2C_MODE;
-      device = "/dev/i2c-0";
+      if (!device) 
+	device = "/dev/i2c-0";
       break;
     case 'S':
       if (speed > 100000) speed = 100000;
@@ -567,13 +600,22 @@ static int parse_opts(int argc, char *argv[])
       break;
 
     case 'u':
-      mode=USB_SPIMODE;
-      device = "/dev/ttyACM0";
+      mode = USB_SPIMODE;
+      if (!device) 
+	device = "/dev/ttyACM0";
       break;
 
+    case '4':
+      r = sscanf (optarg, "%d:%d", &rs485_lid, &rs485_rid);
+      if (r == 0) {
+	fprintf (stderr, "no RS485ID found\n");
+	exit (1);
+      }
+      break;
     case 'U':
-      mode=USB_I2CMODE;
-      device = "/dev/ttyACM0";
+      mode = USB_I2CMODE;
+      if (!device)
+	device = "/dev/ttyACM0";
       break;
 
     case '?':
@@ -586,6 +628,13 @@ static int parse_opts(int argc, char *argv[])
       break;
     }
   }
+
+  if (!device) 
+    device = "/dev/spidev0.0";
+
+  if (mode == MODE_NONE) 
+    mode = SPI_MODE; 
+
   return optind; 
 }
 

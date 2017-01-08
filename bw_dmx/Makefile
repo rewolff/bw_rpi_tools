@@ -2,7 +2,7 @@
 CFLAGS=-Wall -O2
 CC=gcc 
 
-MYBIN=bw_dmx mon_dmx dmx2ola dmx_uart
+MYBIN=bw_dmx mon_dmx dmx2ola dmx_uart makechar
 all: $(MYBIN)
 
 install: $(MYBIN)
