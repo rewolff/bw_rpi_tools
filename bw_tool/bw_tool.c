@@ -141,6 +141,7 @@ int myread (int fd, unsigned char *buf, int len)
   nr = 0;
   while (nr < len) {
     cr = read (fd,  buf+nr, len-nr);
+    if (!cr) break;
     if (cr < 0) return nr?nr:cr;
     nr += cr;
   }
