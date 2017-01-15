@@ -134,6 +134,7 @@ static void i2c_txrx (int fd, unsigned char *buf, int tlen, int rlen)
 }
 
 
+
 int myread (int fd, unsigned char *buf, int len)
 {
   int nr, cr;
@@ -148,6 +149,43 @@ int myread (int fd, unsigned char *buf, int len)
   return nr;
 }
 
+
+int myread_to (int fd, unsigned char *buf, int len, int to)
+{
+  fd_set read_fds, write_fds, except_fds;
+  int nr, cr, rv;
+  struct timeval timeout;
+
+  timeout.tv_sec  = to / 1000000;
+  timeout.tv_usec = to % 1000000;
+
+  FD_ZERO(&read_fds);
+  FD_ZERO(&write_fds);
+  FD_ZERO(&except_fds);
+  FD_SET(fd, &read_fds);
+
+  nr = 0;
+  while (nr < len) {
+    // XXX we count on timeout being modified. Linux is documented to
+    // do this, others usually don't.
+    rv = select(fd + 1, &read_fds, &write_fds, &except_fds, &timeout);
+    if (rv > 0) {
+      if (FD_ISSET (fd, &read_fds)) {
+	cr = read (fd,  buf+nr, len-nr);
+	if (!cr) break; // handle EOF. 
+	if (cr < 0) return nr?nr:cr;
+	nr += cr;
+      }
+    } else if (rv == 0) { 
+      // timeout. 
+      return nr;
+    } else {
+      // error. 
+      return nr?nr:-1;
+    }
+  }
+  return nr;
+}
 
 
 
@@ -183,7 +221,7 @@ static void usb_spitxrx (int fd, unsigned char *buf, int tlen, int rlen)
   }
 
   //XXX: check return code. 
-  if (myread (fd, buf, 4) != 4) {
+  if (myread_to (fd, buf, 4, 1000000) != 4) {
     pabort ("can't read USB");
   }
 
@@ -196,7 +234,7 @@ static void usb_spitxrx (int fd, unsigned char *buf, int tlen, int rlen)
   if (buf[3] != tlen+rlen)
     pabort ("invalid length code from USB");
 
-  if (myread (fd, buf, tlen+rlen) != tlen+rlen) 
+  if (myread_to (fd, buf, tlen+rlen, 1000000) != tlen+rlen) 
     pabort ("can't read USB");
 }
 
