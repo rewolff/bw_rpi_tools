@@ -34,6 +34,7 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
+#include <sys/errno.h>
 #include <linux/types.h>
 #include <linux/spi/spidev.h>
 #include <linux/i2c-dev.h>
@@ -73,7 +74,10 @@ static int debug = 0;
 
 static void pabort(const char *s)
 {
-  perror(s);
+  if (errno)
+    perror(s);
+  else
+    fprintf (stderr, "%s.\n", s);
   exit(1);
 }
 
