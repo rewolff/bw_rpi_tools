@@ -235,9 +235,10 @@ static void usb_spitxrx (int fd, unsigned char *buf, int tlen, int rlen)
   if (buf[1] != (USB_CMD_SPI_TXRX | USB_RESPONSE))
     pabort ("invalid response code from USB");
 
-  if (buf[3] != tlen+rlen)
+  if (buf[3] != tlen+rlen) {
+    printf ("got %d instead of %d: ", buf[3], tlen+rlen);
     pabort ("invalid length code from USB");
-
+  }
   if (myread_to (fd, buf, tlen+rlen, 1000000) != tlen+rlen) 
     pabort ("can't read USB");
 }
