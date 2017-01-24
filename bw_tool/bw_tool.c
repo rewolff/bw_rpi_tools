@@ -35,6 +35,8 @@
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/errno.h>
+#include <termios.h>
+
 #include <linux/types.h>
 #include <linux/spi/spidev.h>
 #include <linux/i2c-dev.h>
@@ -793,6 +795,39 @@ void do_monitor_file (int fd, char *fname)
   }
 }
 
+void setup_virtual_serial (int fd)
+{
+  struct termios tio;
+
+  memset (&tio, 0, sizeof (tio));
+  if (tcgetattr (fd, &tio) < 0)
+    pabort ("TCGETS on device");
+
+  tio.c_lflag = 0;   
+  tio.c_oflag = 0;      
+  tio.c_iflag &= ~(IXON | IXOFF | IXANY); // shut off xon/xoff ctrl
+
+  tio.c_cflag |= (CLOCAL | CREAD);
+  tio.c_cflag &= ~(PARENB | PARODD);    
+  if (tcsetattr (fd, TCSANOW, &tio) != 0) 
+    pabort ("TCSETS on devcie");
+}
+
+void init_device (int fd)
+{
+  switch (mode) {
+  case SPI_MODE:
+    setup_spi_mode (fd);
+    break;
+  case USB_SPIMODE:
+  case USB_I2CMODE:
+    setup_virtual_serial (fd);
+    break;
+  case I2C_MODE:
+    // nothing special. 
+    break;
+  }
+}
 
 
 int main(int argc, char *argv[])
@@ -822,7 +857,7 @@ int main(int argc, char *argv[])
   if (fd < 0)
     pabort("can't open device");
 
-  if (mode == SPI_MODE) setup_spi_mode (fd);
+  init_device (fd);
 
   if (ident) 
     do_ident (fd);
