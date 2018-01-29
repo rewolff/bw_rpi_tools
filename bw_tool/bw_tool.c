@@ -59,6 +59,7 @@ static int addr = 0x82;
 static int text = 0;
 static char *monitor_file;
 static int readmode = 0;
+static int xtendedvalidation = 0, valid=1;
 
 static int rs485_lid = 0, rs485_rid = -1;
 
@@ -98,7 +99,6 @@ void dump_buf (char *t, unsigned char *buf, int n)
 }
 
 
-
 static void spi_txrx (int fd, unsigned char *buf, int tlen, int rlen)
 {
   int ret;
@@ -117,6 +117,7 @@ static void spi_txrx (int fd, unsigned char *buf, int tlen, int rlen)
   ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr);
   if (ret < 1)
     pabort("can't send spi message");
+  valid = buf[1] != 0;
 
 }
 
@@ -528,6 +529,7 @@ static const struct option lopts[] = {
   { "device",  1, 0, 'D' },
   { "speed",   1, 0, 's' },
   { "delay",   1, 0, 'd' },
+  { "xtend",   0, 0, 'x' },
 
   { "reg",       1, 0, 'r' },
   { "val",       1, 0, 'v' },
@@ -568,7 +570,7 @@ static int parse_opts(int argc, char *argv[])
   while (1) {
     int c;
 
-    c = getopt_long(argc, argv, "D:s:d:r:v:a:wWietCm:I1SRUu4:V:", lopts, NULL);
+    c = getopt_long(argc, argv, "D:s:d:r:v:a:wWietxCm:I1SRUu4:V:", lopts, NULL);
 
     if (c == -1)
       break;
@@ -631,6 +633,10 @@ static int parse_opts(int argc, char *argv[])
       break;  
     case 't':
       text = 1;
+      break;
+
+    case 'x':
+      xtendedvalidation = 1;
       break;
 
     case 'C':
@@ -924,6 +930,7 @@ int main(int argc, char *argv[])
 	exit (1);
       }
 
+      if (xtendedvalidation && !valid) printf ("?");
       if (numberformat == 'x') {
         switch (typech) {
         case 'b':printf ("%02llx ", val);break;

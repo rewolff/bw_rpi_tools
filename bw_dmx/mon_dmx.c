@@ -13,9 +13,11 @@ int main (int argc, char **argv)
   unsigned char *data, tdata[0x200];
   int i, infd;
 
+  if (argc > 1) 
+     thefile = argv[1];
+  else
+     thefile = "dmxdata";
 
-  thefile = "dmxdata";
-//argv[nonoptions];
   infd = open (thefile, O_RDWR); 
   if (infd < 0) {
      perror (thefile);
