@@ -3,7 +3,7 @@
 
 struct spi_txrx {
   int cmd;
-  int param;
+  int p1, p2;
   union {
     unsigned char r_dmxbuf[516]; // 513 + alignment. 
     int r_params[10];
@@ -30,6 +30,7 @@ enum mode_t { DMX_IDLE, DMX_TX, DMX_RX};
 
 /* ******************** the protocol *******************************/
 enum spi_cmd_t { CMD_DMXDATA=0x1234, 
+                 CMD_DMX_DATA,
 		 CMD_SETBREAK,   
 		 CMD_SETMAB, 
 		 CMD_SETDATALEN,

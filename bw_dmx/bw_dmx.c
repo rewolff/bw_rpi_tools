@@ -714,7 +714,9 @@ int main(int argc, char *argv[])
   last = -1;
   while (1) {
     if (dmxmode == DMX_TX) {
-       spibuf.cmd = CMD_DMXDATA;
+       spibuf.cmd = CMD_DMX_DATA;
+       spibuf.p1 = 0x1;
+       spibuf.p2 = 0x200;
        memcpy (spibuf.dmxbuf, data, 0x200);
     }
 
@@ -726,9 +728,9 @@ int main(int argc, char *argv[])
     transfer (fd, (void*) &spibuf, 0x209, 0); 
 
     if (dmxmode == DMX_RX) {
-       if (spibuf.param != last) {
+       if (spibuf.p1 != last) {
           memcpy (data, spibuf.dmxbuf, 0x200);
-          last = spibuf.param;
+          last = spibuf.p1;
        } else {
           if (spibuf.cmd == STAT_RX_IN_PROGRESS) {
              usleep (1000);
