@@ -665,6 +665,7 @@ void do_monitor_file (int fd, char *fname)
 
 
 
+#define MAXUNIV 16
 
 int main(int argc, char *argv[])
 {
@@ -676,8 +677,9 @@ int main(int argc, char *argv[])
 //  char format[32];
   char *thefile;
   int infd;
-  unsigned char *data;
+  unsigned char *data[MAXUNIV];
   int nodata = 0;
+  int i, u, numuniv;
 
   if (argc <= 1) {
     print_usage (argv[0]);
@@ -699,25 +701,32 @@ int main(int argc, char *argv[])
     transfer (fd, (void*) &spibuf, 0x209, 0); 
     exit (0);
   }   
-    
 
-  thefile = argv[nonoptions];
-  infd = open (thefile, O_RDWR); 
-  if (infd < 0) {
-     perror (thefile);
-     exit (1);
+  numuniv = 0;
+  for (i=nonoptions;i<argc;i++, numuniv++) {
+    thefile = argv[i];
+    infd = open (thefile, O_RDWR); 
+    if (infd < 0) {
+      perror (thefile);
+      exit (1);
+    }
+    data[numuniv] = mmap (NULL, 0x200, PROT_READ | PROT_WRITE, MAP_SHARED, infd, 0);
+    if (data[numuniv] == (void *)-1) {
+      perror ("mmap");
+      exit (1);
+    }
   }
-  data = mmap (NULL, 0x200, PROT_READ | PROT_WRITE, MAP_SHARED, infd, 0);
-
-
-
+  //printf ("got %d unvi.\n", numuniv);
   last = -1;
+  u = 0;
   while (1) {
     if (dmxmode == DMX_TX) {
-       spibuf.cmd = CMD_DMX_DATA;
-       spibuf.p1 = 0x1;
-       spibuf.p2 = 0x200;
-       memcpy (spibuf.dmxbuf, data, 0x200);
+      //putchar ('0'+u); fflush (stdout);
+      spibuf.cmd = CMD_DMX_DATA;
+      spibuf.p1 = 0x1 | (u << 10);
+      spibuf.p2 = 0x200;
+      memcpy (spibuf.dmxbuf, data[u++], 0x200);
+      if (u >= numuniv) u = 0;
     }
 
     if (dmxmode == DMX_RX) {
@@ -740,10 +749,8 @@ int main(int argc, char *argv[])
           fflush (stdout);
        }
     }
-    
     usleep (wait);
   }
-  
 
   exit (0);
 }
