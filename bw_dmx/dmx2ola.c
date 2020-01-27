@@ -400,16 +400,16 @@ int main(int argc, char *argv[])
     // transfer 8 byte header + 513 byte datablock. 
     transfer (fd, (void*) &spibuf, 0x209, 0); 
 
-    if (spibuf.param != last) {
+    if (spibuf.p1 != last) {
       if (memcmp (data, spibuf.dmxbuf, 0x200) != 0) {
 	memcpy (data, spibuf.dmxbuf, 0x200);
 	// The DMX data starts at offset 1. 
 	for (i=1;i<512;i++)
 	  fprintf (ola_streaming_fp, "%d,", data[i]);
-	fprintf (ola_streaming_fp, "%d\n", data[i]);
+	//fprintf (ola_streaming_fp, "%d\n", data[i]);
 	fflush (ola_streaming_fp);
       }
-      last = spibuf.param;
+      last = spibuf.p1;
       printf ("data/nodata %d/%d \r", yesdata++, nodata); 
       fflush (stdout);
     } else {

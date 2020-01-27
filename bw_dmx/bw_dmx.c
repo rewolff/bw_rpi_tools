@@ -473,6 +473,7 @@ static const struct option lopts[] = {
   { "device",  1, 0, 'D' },
   { "speed",   1, 0, 's' },
   { "delay",   1, 0, 'd' },
+  { "wait",    1, 0, 'w' },
 
   { "idle",      0, 0, 'i' },
   { "rx",        0, 0, 'r' },
@@ -509,7 +510,7 @@ static int parse_opts(int argc, char *argv[])
   while (1) {
     int c;
 
-    c = getopt_long(argc, argv, "D:s:d:rV:i", lopts, NULL);
+    c = getopt_long(argc, argv, "D:s:d:rV:w:i", lopts, NULL);
 
     if (c == -1)
       break;
@@ -525,6 +526,9 @@ static int parse_opts(int argc, char *argv[])
       break;
     case 'd':
       delay = atoi(optarg);
+      break;
+    case 'w':
+      wait = 1000*atoi(optarg);
       break;
     case 'r':
       dmxmode = DMX_RX;
@@ -738,7 +742,7 @@ int main(int argc, char *argv[])
 
     if (dmxmode == DMX_RX) {
        if (spibuf.p1 != last) {
-          memcpy (data, spibuf.dmxbuf, 0x200);
+          memcpy (data[0], spibuf.dmxbuf, 0x200);
           last = spibuf.p1;
        } else {
           if (spibuf.cmd == STAT_RX_IN_PROGRESS) {
