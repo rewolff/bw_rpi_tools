@@ -36,6 +36,7 @@
 #include <sys/stat.h>
 #include <sys/errno.h>
 #include <termios.h>
+#include <time.h>
 
 #include <linux/types.h>
 #include <linux/spi/spidev.h>
@@ -53,7 +54,10 @@ static int mode = MODE_NONE;
 static const char *device = NULL; // = "/dev/spidev0.0";
 static uint8_t spi_mode;
 static uint8_t bits = 8;
-static uint32_t speed = 240000;
+
+static uint32_t speed = 100000;
+#define MAX_READ_SPEED 100000 
+
 static uint16_t delay = 20;
 static int addr = 0x82;
 static int text = 0;
@@ -70,6 +74,9 @@ static int write8mode, writemiscmode, ident, readee;
 static int scan = 0;
 static int hexmode = 0;
 static char numberformat = 'x';
+static int mode2 = 0;
+
+static int tid; // Transaction ID. Best if not recycled... (but wraps after 256). 
 
 static int debug = 0;
 #define DEBUG_REGSETTING 0x0001
@@ -280,6 +287,36 @@ static void usb_i2ctxrx (int fd, unsigned char *buf, int tlen, int rlen)
 
   if (myread (fd, buf+tlen, rlen) != rlen) 
     pabort ("can't read USB");
+}
+
+
+#define CRC16 0x8005
+
+
+uint16_t crc16 (uint16_t crc, unsigned char *data, int size)
+{
+  int i;
+  unsigned char c;
+
+  /* Sanity check: */
+  if(data == NULL)
+    return 0;
+
+  while(size > 0) {
+    c = *data++;
+    size--;
+    for (i=0;i<8;i++) {
+      /* the shift part*/
+      if (crc & 0x8000) 
+        crc = (crc << 1) ^ CRC16;       /* the feedback part: */
+      else
+        crc = (crc << 1);
+
+      crc ^= c & 1; // get next bit. 
+      c >>= 1;
+    }
+  }
+  return crc;
 }
 
 
@@ -541,6 +578,8 @@ static const struct option lopts[] = {
   { "read",      0, 0, 'R' },
   { "eeprom",    0, 0, 'e' },
 
+  { "mode2",     0, 0, '2' },
+
 
   // Options for LCD
   { "text",      0, 0, 't' },
@@ -570,7 +609,7 @@ static int parse_opts(int argc, char *argv[])
   while (1) {
     int c;
 
-    c = getopt_long(argc, argv, "D:s:d:r:v:a:wWietxCm:I1SRUu4:V:", lopts, NULL);
+    c = getopt_long(argc, argv, "D:s:d:r:v:a:wWietxCm:I1SRUu4:V:2", lopts, NULL);
 
     if (c == -1)
       break;
@@ -615,11 +654,11 @@ static int parse_opts(int argc, char *argv[])
       writemiscmode = 1;
       break;
     case 'R':
-      if (speed > 100000) speed = 100000;
+      if (speed > MAX_READ_SPEED) speed = MAX_READ_SPEED;
       readmode = 1;
       break;
     case 'i':
-      if (speed > 100000) speed = 100000;
+      if (speed > MAX_READ_SPEED) speed = MAX_READ_SPEED;
       ident = 1;
       break;
     case 'I':
@@ -628,7 +667,7 @@ static int parse_opts(int argc, char *argv[])
 	device = "/dev/i2c-0";
       break;
     case 'S':
-      if (speed > 100000) speed = 100000;
+      if (speed > MAX_READ_SPEED) speed = MAX_READ_SPEED;
       scan=1;
       break;  
     case 't':
@@ -656,7 +695,9 @@ static int parse_opts(int argc, char *argv[])
       if (!device) 
 	device = "/dev/ttyACM0";
       break;
-
+    case '2':
+      mode2 = 1;
+      break;
     case '4':
       r = sscanf (optarg, "%d:%d", &rs485_lid, &rs485_rid);
       if (r == 0) {
@@ -697,7 +738,7 @@ void setup_spi_mode (int fd)
   /*
    * spi mode
    */
-  // printf ("setting spi mode. \n");
+  //printf ("setting spi mode. %d/%d\n", speed, spi_mode);
   ret = ioctl(fd, SPI_IOC_WR_MODE, &spi_mode);
   if (ret == -1)
     pabort("can't set spi mode");
@@ -821,6 +862,7 @@ void setup_virtual_serial (int fd)
 
 void init_device (int fd)
 {
+  //printf ("init device %d.\n", speed);
   switch (mode) {
   case SPI_MODE:
     setup_spi_mode (fd);
@@ -835,6 +877,78 @@ void init_device (int fd)
   }
 }
 
+int typelen (char typech)
+{
+  
+  switch (typech) {
+  case 'b':return 1;
+  case 's':return 2;
+  case 'i':return 4;
+  case 'l':return 8;
+  default:
+    fprintf (stderr, "Don't understand the type '%c'\n", typech);
+    exit (1);
+  }
+}
+
+char *formatstr (char typech)
+{
+  if (numberformat != 'x') return "%lld";
+  switch (typech) {
+  case 'b':return "%02llx ";
+  case 's':return "%04llx ";
+  case 'i':return "%08llx ";
+  case 'l':return "%016llx ";
+  }
+  return "%lld"; // should not happen. 
+}
+
+unsigned long long get_value (unsigned char *buf, int len)
+{
+  if (len == 1)
+    return *buf;
+  if (len == 2)
+    return get_value (buf, 1) | get_value (buf+1, 1) << 8;
+  if (len == 4)
+    return get_value (buf, 2) | get_value (buf+2, 2) << 16;
+  if (len == 8)
+    return get_value (buf, 4) | get_value (buf+4, 4) << 32;
+  return *buf;
+}
+
+int get_update_tid (void)
+{
+  //char *tidp;
+  char buf[32];
+  int ltid;
+  FILE *fp;
+
+  sprintf (buf, "%s/.tid:", getenv ("HOME"));
+  fp = fopen (buf, "r");
+
+  if (!fp || (fscanf (fp, "%d", &ltid) < 1)) {
+
+    srand (time (NULL));
+    ltid = rand () & 0xff;
+  }
+  if (fp) fclose (fp);
+  
+  fp = fopen (buf, "w");
+#if 1
+  if (!fp) {
+    fprintf (stderr, "Can't open %s", buf);
+    perror ("");
+    exit (1);
+  }
+#endif
+
+  fprintf (fp, "%d\n", ltid+1);
+  fclose (fp);
+
+  return ltid;
+}
+
+
 
 int main(int argc, char *argv[])
 {
@@ -844,6 +958,8 @@ int main(int argc, char *argv[])
   int i, rv;
   char typech;
   char format[32];
+  unsigned char tbuf[0x100];
+  int bp, crc, rlen;
 
   if (argc <= 1) {
     print_usage (argv[0]);
@@ -853,7 +969,7 @@ int main(int argc, char *argv[])
   nonoptions = parse_opts(argc, argv);
 
   if (write8mode && writemiscmode) {
-    fprintf (stderr, "Can't use write8 and write16 at the same time\n");
+    fprintf (stderr, "Can't use write8 and write misc at the same time\n");
     exit (1);
   }
 
@@ -888,60 +1004,165 @@ int main(int argc, char *argv[])
     exit (0);
   }
 
+  tid = get_update_tid ();
+  //printf ("Got tid=%d(0x%02x).\n", tid, tid);
   if (writemiscmode) {
+    sprintf (format, "%%x:%%ll%c:%%c", numberformat);
+    if (mode2) {
+      bp=0;
+      tbuf[bp++] = addr;
+      tbuf[bp++] = 0xc2;
+      tbuf[bp++] = tid;
+    }
+      
     for (i=nonoptions;i<argc;i++) {
-      sprintf (format, "%%x:%%ll%c:%%c", numberformat);
+      typech = 'b';
       rv = sscanf (argv[i], format, &reg, &val, &typech);
       if (rv < 2) {
         fprintf (stderr, "don't understand reg:val:type in: %s\n", argv[i]);
         exit (1);
       }
-      if (rv == 2) typech = 'b';
-      switch (typech) {
-      case 'b':	set_reg_value8  (fd, reg, val);break;
-      case 's':	set_reg_value16 (fd, reg, val);break;
-      case 'i':	set_reg_value32 (fd, reg, val);break;
-      case 'l':	set_reg_value64 (fd, reg, val);break;
-      default:
-	fprintf (stderr, "Don't understand the type value in %s\n", argv[i]);
-	exit (1);
+
+      if (mode2) {
+	switch (typech) {
+	case 'b':tbuf[bp++] = 1;tbuf[bp++] = reg;tbuf[bp++] = val;break;
+	case 's':tbuf[bp++] = 2;tbuf[bp++] = reg;
+	  tbuf[bp++] = (val >> 0) & 0xff;
+	  tbuf[bp++] = (val >> 8) & 0xff;
+	  break;
+	case 'i':tbuf[bp++] = 4;tbuf[bp++] = reg;
+	  tbuf[bp++] = (val >>  0) & 0xff;
+	  tbuf[bp++] = (val >>  8) & 0xff;
+	  tbuf[bp++] = (val >> 16) & 0xff;
+	  tbuf[bp++] = (val >> 24) & 0xff;
+	  break;
+	case 'l':tbuf[bp++] = 8;tbuf[bp++] = reg;
+	  tbuf[bp++] = (val >>  0) & 0xff;
+	  tbuf[bp++] = (val >>  8) & 0xff;
+	  tbuf[bp++] = (val >> 16) & 0xff;
+	  tbuf[bp++] = (val >> 24) & 0xff;
+	  tbuf[bp++] = (val >> 32) & 0xff;
+	  tbuf[bp++] = (val >> 40) & 0xff;
+	  tbuf[bp++] = (val >> 48) & 0xff;
+	  tbuf[bp++] = (val >> 56) & 0xff;
+	default:
+	  fprintf (stderr, "Don't understand the type value in %s\n", argv[i]);
+	  exit (1);
+	}
+      } else {
+	switch (typech) {
+	case 'b':	set_reg_value8  (fd, reg, val);break;
+	case 's':	set_reg_value16 (fd, reg, val);break;
+	case 'i':	set_reg_value32 (fd, reg, val);break;
+	case 'l':	set_reg_value64 (fd, reg, val);break;
+	default:
+	  fprintf (stderr, "Don't understand the type value in %s\n", argv[i]);
+	  exit (1);
+	}
       }
     }
-    exit (0);
+    if (mode2) {
+      crc = crc16 (0, tbuf, bp);
+      tbuf[bp++] = crc & 0xff;
+      tbuf[bp++] = crc >> 8;
+      dump_buf ("m2: Before tx:", tbuf, bp);
+      transfer (fd, tbuf, bp, 0);
+      usleep (100);
+      tbuf[0] = addr + 1;
+      transfer (fd, tbuf, 8, 0);
+      dump_buf ("      got: ", tbuf, 8);
+      if (tbuf[1] != addr) 
+	printf ("Didn't return addr: %02x\n", tbuf[1]);
+      if (tbuf[2] == 0xcc) {
+	crc = crc16 (0, tbuf+1, 3);
+	if (crc != get_value (tbuf+4, 2)) 
+	  printf ("Invalid checksum on write-ack: %04x/%04llx\n", crc, get_value(tbuf+4,2));
+	// All ok. do nothing. 
+
+      } else  if (tbuf[2] == 0xee) {
+	// XXX check checksum. 
+	printf ("Got badCRC reply! slave expected: %02x%02x\n", tbuf[4], tbuf[3]);
+      } else {
+	printf ("got unexpected reply type: %02x\n", tbuf[2]);
+      }
+    }    exit (0);
   }
 
   if (readmode) {
-    for (i=nonoptions;i<argc;i++) {
-      rv = sscanf (argv[i], "%x:%c", &reg, &typech);
-      if (debug & DEBUG_REGSETTING)
-        fprintf (stdout, "Reading register 0x%02X type %c\n",reg,typech);
-      if (rv < 1) {
-        fprintf (stderr, "don't understand reg:type in: %s\n", argv[i]);
-        exit (1);
+    if (mode2) {
+      bp = 0;
+      rlen = 0;
+      tbuf[bp++] = addr;
+      tbuf[bp++] = 0xc1;
+      tbuf[bp++] = tid;
+      for (i=nonoptions;i<argc;i++) {
+	rv = sscanf (argv[i], "%x:%c", &reg, &typech);
+	if (rv < 1) {
+	  fprintf (stderr, "don't understand reg:type in: %s\n", argv[i]);
+	  exit (1);
+	}
+	if (rv == 1) typech = 'b';
+	rlen += tbuf[bp++] = typelen (typech);
+	tbuf[bp++] = reg;
       }
-      if (rv == 1) typech = 'b';
-      switch (typech) {
-      case 'b':	val = get_reg_value8  (fd, reg);break;
-      case 's':	val = get_reg_value16 (fd, reg);break;
-      case 'i':	val = get_reg_value32 (fd, reg);break;
-      case 'l':	val = get_reg_value64 (fd, reg);break;
-      default:
-	fprintf (stderr, "Don't understand the type value in %s\n", argv[i]);
-	exit (1);
-      }
+      crc = crc16 (0, tbuf, bp);
+      tbuf[bp++] = crc & 0xff;
+      tbuf[bp++] = crc >> 8;
 
-      if (xtendedvalidation && !valid) printf ("?");
-      if (numberformat == 'x') {
-        switch (typech) {
-        case 'b':printf ("%02llx ", val);break;
-        case 's':printf ("%04llx ", val);break;
-        case 'i':printf ("%08llx ", val);break;
-        case 'l':printf ("%016llx ", val);break;
-        }
-      } else {
-        printf ("%lld ", val);
-      }
+      dump_buf ("m2read: sending: ", tbuf, bp);
+      transfer (fd, tbuf, bp, 0);
 
+      usleep (100);
+      tbuf[0] = addr+1;
+
+      transfer (fd, tbuf, rlen+6,0);
+
+      printf ("rlen=%2d  ", rlen);
+      dump_buf ("got: ", tbuf, rlen+6);
+
+      if (tbuf[1] != addr) 
+	printf ("Didn't return addr: %02x\n", tbuf[1]);
+      if (tbuf[2] != 0xaa)
+	printf ("Didn't get ack response: %02x\n", tbuf[2]);
+      if (tbuf[3] != tid)
+	printf ("Didn't get tid: %02x\n", tbuf[3]);
+
+      crc = crc16 (0, tbuf+1, rlen+3); // transferred rlen+6:  address+data+crc
+      if ( get_value(tbuf+rlen+4, 2) != crc) {
+	printf ("bad crc: %04llx / %04x \n",  get_value(tbuf+rlen+3, 2), crc);
+      }
+      bp=4;
+      for (i=nonoptions;i<argc;i++) {
+	typech = 'b'; // default.
+	rv = sscanf (argv[i], "%*x:%c", &typech);
+	printf (formatstr (typech), get_value (tbuf+bp, typelen (typech)));
+	bp += typelen (typech);
+      }
+     
+    } else {
+      for (i=nonoptions;i<argc;i++) {
+	typech = 'b'; // default.
+	rv = sscanf (argv[i], "%x:%c", &reg, &typech);
+	if (debug & DEBUG_REGSETTING)
+	  fprintf (stdout, "Reading register 0x%02X type %c\n",reg,typech);
+	if (rv < 1) {
+	  fprintf (stderr, "don't understand reg:type in: %s\n", argv[i]);
+	  exit (1);
+	}
+
+	switch (typech) {
+	case 'b':	val = get_reg_value8  (fd, reg);break;
+	case 's':	val = get_reg_value16 (fd, reg);break;
+	case 'i':	val = get_reg_value32 (fd, reg);break;
+	case 'l':	val = get_reg_value64 (fd, reg);break;
+	default:
+	  fprintf (stderr, "Don't understand the type value in %s\n", argv[i]);
+	  exit (1);
+	}
+	
+	if (xtendedvalidation && !valid) printf ("?");
+	printf (formatstr(typech), val);
+      }
     }
     printf ("\n");
     exit (0);
