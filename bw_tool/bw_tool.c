@@ -923,7 +923,7 @@ int get_update_tid (void)
   int ltid;
   FILE *fp;
 
-  sprintf (buf, "%s/.tid:", getenv ("HOME"));
+  sprintf (buf, "%s/.tid", getenv ("HOME"));
   fp = fopen (buf, "r");
 
   if (!fp || (fscanf (fp, "%d", &ltid) < 1)) {
@@ -1073,6 +1073,8 @@ int main(int argc, char *argv[])
       dump_buf ("      got: ", tbuf, 8);
       if (tbuf[1] != addr) 
 	printf ("Didn't return addr: %02x\n", tbuf[1]);
+      if (tbuf[3] != (tid & 0xff))
+	printf ("Didn't get tid: %02x\n", tbuf[3]);
       if (tbuf[2] == 0xcc) {
 	crc = crc16 (0, tbuf+1, 3);
 	if (crc != get_value (tbuf+4, 2)) 
@@ -1124,7 +1126,7 @@ int main(int argc, char *argv[])
 	printf ("Didn't return addr: %02x\n", tbuf[1]);
       if (tbuf[2] != 0xaa)
 	printf ("Didn't get ack response: %02x\n", tbuf[2]);
-      if (tbuf[3] != tid)
+      if (tbuf[3] != (tid & 0xff))
 	printf ("Didn't get tid: %02x\n", tbuf[3]);
 
       crc = crc16 (0, tbuf+1, rlen+3); // transferred rlen+6:  address+data+crc
