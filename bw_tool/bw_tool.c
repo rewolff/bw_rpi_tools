@@ -75,6 +75,7 @@ static int scan = 0;
 static int hexmode = 0;
 static char numberformat = 'x';
 static int mode2 = 0;
+static char tidfnamebuf[0x100], *tidfname;
 
 static int tid; // Transaction ID. Best if not recycled... (but wraps after 256). 
 
@@ -100,7 +101,7 @@ void dump_buffer (unsigned char *buf, int n)
 
 void dump_buf (char *t, unsigned char *buf, int n)
 {
-  printf ("%s", t);
+  printf ("%s %d:", t, n);
   dump_buffer (buf, n);
   printf ("\n");
 }
@@ -323,7 +324,7 @@ uint16_t crc16 (uint16_t crc, unsigned char *data, int size)
 static void transfer(int fd, unsigned char *buf, int tlen, int rlen)
 {
   if (debug & DEBUG_TRANSFER) 
-    dump_buf ("Before tx:", buf, tlen);
+    dump_buf ("tx", buf, tlen);
   if (mode == SPI_MODE) 
     spi_txrx (fd, buf, tlen, rlen);
   else if (mode == I2C_MODE) 
@@ -336,7 +337,7 @@ static void transfer(int fd, unsigned char *buf, int tlen, int rlen)
     pabort ("invalid mode...\n");
 
   if (debug & DEBUG_TRANSFER) 
-    dump_buf ("rx:", buf, tlen+rlen);
+    dump_buf ("rx", buf, tlen+rlen);
 }
 
 
@@ -464,25 +465,6 @@ static long long get_reg_value64 (int fd, int reg)
   return ((long long) tt << 32)  | t;
 }
 
-
-static void do_ident (int fd)
-{
-  unsigned char buf[0x20];
-  int i;
-
-  buf [0] = addr | 1;
-  buf [1] = 1;
-
-  transfer (fd, buf, 0x2,0x20);
-
-  for (i= 2 ;i<0x20;i++) {
-    if (!buf[i]) break;
-    putchar (buf[i]);
-  }
-  putchar ('\n');
-}
-
-
 static void do_readee (int fd)
 {
 #define EELEN 0x80
@@ -503,6 +485,116 @@ static void do_readee (int fd)
 }
 
 
+
+
+unsigned long long get_value (unsigned char *buf, int len)
+{
+  if (len == 1)
+    return *buf;
+  if (len == 2)
+    return get_value (buf, 1) | get_value (buf+1, 1) << 8;
+  if (len == 4)
+    return get_value (buf, 2) | get_value (buf+2, 2) << 16;
+  if (len == 8)
+    return get_value (buf, 4) | get_value (buf+4, 4) << 32;
+  return *buf;
+}
+
+
+#define FLAG_ADDR 1
+#define FLAG_ERR  2
+#define FLAG_DBG  4
+
+static void do_ident (int fd, int a, int flags)
+{
+  unsigned char buf[0x20];
+  int i;
+  int bp, crc; 
+
+
+#define IDLEN 0x18
+  if (mode2) {
+    //flags |= FLAG_DBG;
+    //usleep (200);
+    bp = 0;
+    buf [bp++] = a;
+    buf [bp++] = 0xc1;
+    buf [bp++] = tid;
+    buf [bp++] = IDLEN;
+    buf [bp++] = 1;
+    crc = crc16 (0, buf, bp);
+    buf [bp++] = crc;
+    buf [bp++] = crc >> 8;
+    //if (flags & FLAG_DBG) if (debug & DEBUG_TRANSFER) dump_buf ("D: ident before TX: ", buf, bp);
+    
+    transfer (fd, buf, bp,0);
+    usleep (700); 
+    buf[0] = a | 1;
+    transfer (fd, buf, IDLEN+7,0);
+    //if (flags & FLAG_DBG) if (debug & DEBUG_TRANSFER) dump_buf ("nD: ident got:", buf, IDLEN+7);
+
+    //printf ("D:<%02x>\n", a);fflush (stdout);
+    
+    if (buf [1] != a) {
+      //printf ("xx");fflush (stdout);
+      if (flags & FLAG_ERR) 
+	printf ("E: ident: Didn't get addr back: %02x\n", buf[1]);
+      return;
+    }
+    //printf ("yy");fflush (stdout);
+    if (buf [2] != 0xaa) {
+      //printf ("zz");fflush (stdout);
+      if (flags & FLAG_ERR) 
+	printf ("E: ident: Didn't get read ack: %02x\n", buf[2]);
+      return;
+    }
+    //printf ("aa");fflush (stdout);
+
+    if (buf [3] != (tid & 0xff)) {
+      //printf ("bb");fflush (stdout);
+      if (flags & FLAG_ERR) 
+	printf ("E: ident: Didn't get tid: %02x/%02x\n", buf[2], tid &0xff);
+      return;
+    }
+    //printf ("cc");fflush (stdout);
+
+    crc = crc16 (0, buf+1, IDLEN+3);
+    if (get_value (buf+IDLEN+4, 2) != crc) {
+      //printf ("dd");fflush (stdout);
+      if (flags & FLAG_ERR) 
+	printf ("E: ident: invalid CRC: %04llx/%04x\n", 
+		get_value (buf+IDLEN+3, 2), crc);
+      return;
+    }
+    i = 4;
+    //printf ("ee");fflush (stdout);
+    //printf ("D: ident got: ");
+    //dump_buffer (buf, IDLEN+7);
+    //printf ("\n");
+    
+    if (flags & FLAG_ADDR) 
+      printf ("%02x: ", a);
+
+  } else {
+    buf [0] = addr | 1;
+    buf [1] = 1;
+    
+    transfer (fd, buf, 0x2,0x20);
+    i = 2;
+  }
+
+  for ( ;i<0x20;i++) {
+    if (!buf[i]) break;
+    printf ("%c", buf[i]);
+    //putchar (buf[i]);
+  }
+  printf ("\n");
+  //putchar ('\n');
+  fflush (stdout);
+}
+
+
+
 char mkprintable (char ch)
 {
   if (ch < ' ') return '.';
@@ -516,6 +608,17 @@ static void do_scan (int fd)
   unsigned char buf[0x20];
   int add;
   int i;
+
+  if (mode2) {
+    //printf ("Scanning.\n");
+    for (add = 0;add < 255;add += 2) {
+      //printf ("scan %d starting.\n", add);
+      do_ident (fd, add, FLAG_ADDR);
+      //printf ("scan %d done. \n", add);
+    }
+    return;
+  }
+
 
   for (add = 0;add < 255;add += 2) {
     buf[0] = add | 1;
@@ -568,6 +671,9 @@ static const struct option lopts[] = {
   { "delay",   1, 0, 'd' },
   { "xtend",   0, 0, 'x' },
 
+  { "mode2",     0, 0, '2' },
+  { "tidfile",   1, 0, 'T' },
+
   { "reg",       1, 0, 'r' },
   { "val",       1, 0, 'v' },
   { "addr",      1, 0, 'a' },
@@ -578,7 +684,6 @@ static const struct option lopts[] = {
   { "read",      0, 0, 'R' },
   { "eeprom",    0, 0, 'e' },
 
-  { "mode2",     0, 0, '2' },
 
 
   // Options for LCD
@@ -694,6 +799,9 @@ static int parse_opts(int argc, char *argv[])
       mode = USB_SPIMODE;
       if (!device) 
 	device = "/dev/ttyACM0";
+      break;
+    case 'T':
+      tidfname = strdup (optarg);
       break;
     case '2':
       mode2 = 1;
@@ -903,18 +1011,6 @@ char *formatstr (char typech)
   return "%lld"; // should not happen. 
 }
 
-unsigned long long get_value (unsigned char *buf, int len)
-{
-  if (len == 1)
-    return *buf;
-  if (len == 2)
-    return get_value (buf, 1) | get_value (buf+1, 1) << 8;
-  if (len == 4)
-    return get_value (buf, 2) | get_value (buf+2, 2) << 16;
-  if (len == 8)
-    return get_value (buf, 4) | get_value (buf+4, 4) << 32;
-  return *buf;
-}
 
 int get_update_tid (void)
 {
@@ -923,11 +1019,8 @@ int get_update_tid (void)
   int ltid;
   FILE *fp;
 
-  sprintf (buf, "%s/.tid", getenv ("HOME"));
-  fp = fopen (buf, "r");
-
+  fp = fopen (tidfname, "r");
   if (!fp || (fscanf (fp, "%d", &ltid) < 1)) {
-
     srand (time (NULL));
     ltid = rand () & 0xff;
   }
@@ -961,10 +1054,13 @@ int main(int argc, char *argv[])
   unsigned char tbuf[0x100];
   int bp, crc, rlen;
 
+
   if (argc <= 1) {
     print_usage (argv[0]);
     exit (0);
   }
+  sprintf (tidfnamebuf, "%s/.tid", getenv ("HOME"));
+  tidfname = tidfnamebuf; 
 
   nonoptions = parse_opts(argc, argv);
 
@@ -981,8 +1077,8 @@ int main(int argc, char *argv[])
 
   init_device (fd);
 
-  if (ident) 
-    do_ident (fd);
+  if (ident)
+    do_ident (fd, addr, FLAG_ERR | FLAG_DBG);
 
   if (readee) 
     do_readee (fd);
@@ -1065,27 +1161,29 @@ int main(int argc, char *argv[])
       crc = crc16 (0, tbuf, bp);
       tbuf[bp++] = crc & 0xff;
       tbuf[bp++] = crc >> 8;
-      dump_buf ("m2: Before tx:", tbuf, bp);
+      //if (debug & DEBUG_TRANSFER) dump_buf ("D: m2: Before tx:", tbuf, bp);
+
+      if (bp > 33) printf ("W: Transfer %d > 32 bytes. Target may not support this.\n", bp);
       transfer (fd, tbuf, bp, 0);
       usleep (100);
       tbuf[0] = addr + 1;
       transfer (fd, tbuf, 8, 0);
-      dump_buf ("      got: ", tbuf, 8);
+      //if (debug & DEBUG_TRANSFER) dump_buf ("D:       got: ", tbuf, 8);
       if (tbuf[1] != addr) 
-	printf ("Didn't return addr: %02x\n", tbuf[1]);
+	printf ("E: Didn't return addr: %02x\n", tbuf[1]);
       if (tbuf[3] != (tid & 0xff))
-	printf ("Didn't get tid: %02x\n", tbuf[3]);
+	printf ("E: Didn't get tid: %02x/%02x\n", tbuf[3], tid & 0xff);
       if (tbuf[2] == 0xcc) {
 	crc = crc16 (0, tbuf+1, 3);
 	if (crc != get_value (tbuf+4, 2)) 
-	  printf ("Invalid checksum on write-ack: %04x/%04llx\n", crc, get_value(tbuf+4,2));
+	  printf ("E: Invalid checksum on write-ack: %04x/%04llx\n", crc, get_value(tbuf+4,2));
 	// All ok. do nothing. 
 
       } else  if (tbuf[2] == 0xee) {
 	// XXX check checksum. 
-	printf ("Got badCRC reply! slave expected: %02x%02x\n", tbuf[4], tbuf[3]);
+	printf ("E: Got badCRC reply! slave expected: %02x%02x\n", tbuf[4], tbuf[3]);
       } else {
-	printf ("got unexpected reply type: %02x\n", tbuf[2]);
+	printf ("E: got unexpected reply type: %02x\n", tbuf[2]);
       }
     }    exit (0);
   }
@@ -1111,27 +1209,28 @@ int main(int argc, char *argv[])
       tbuf[bp++] = crc & 0xff;
       tbuf[bp++] = crc >> 8;
 
-      dump_buf ("m2read: sending: ", tbuf, bp);
+      //if (debug & DEBUG_TRANSFER) dump_buf ("D: m2read: sending: ", tbuf, bp);
       transfer (fd, tbuf, bp, 0);
 
       usleep (100);
       tbuf[0] = addr+1;
 
+      if ((rlen+6) > 33) printf ("W: Transfer %d > 32 bytes. Target may not support this.\n", rlen+6);
       transfer (fd, tbuf, rlen+6,0);
 
-      printf ("rlen=%2d  ", rlen);
-      dump_buf ("got: ", tbuf, rlen+6);
+      //printf ("rlen=%2d  ", rlen);
+      // if (debug & DEBUG_TRANSFER) dump_buf ("D: got: ", tbuf, rlen+6);
 
       if (tbuf[1] != addr) 
-	printf ("Didn't return addr: %02x\n", tbuf[1]);
+	printf ("E: Didn't return addr: %02x\n", tbuf[1]);
       if (tbuf[2] != 0xaa)
-	printf ("Didn't get ack response: %02x\n", tbuf[2]);
+	printf ("E: Didn't get ack response: %02x\n", tbuf[2]);
       if (tbuf[3] != (tid & 0xff))
-	printf ("Didn't get tid: %02x\n", tbuf[3]);
+	printf ("E: Didn't get tid: %02x/%02x\n", tbuf[3], tid & 0xff);
 
       crc = crc16 (0, tbuf+1, rlen+3); // transferred rlen+6:  address+data+crc
       if ( get_value(tbuf+rlen+4, 2) != crc) {
-	printf ("bad crc: %04llx / %04x \n",  get_value(tbuf+rlen+3, 2), crc);
+	printf ("E: bad crc: %04llx / %04x \n",  get_value(tbuf+rlen+3, 2), crc);
       }
       bp=4;
       for (i=nonoptions;i<argc;i++) {
