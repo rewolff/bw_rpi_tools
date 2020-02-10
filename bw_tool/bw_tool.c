@@ -1053,7 +1053,8 @@ int main(int argc, char *argv[])
   char format[32];
   unsigned char tbuf[0x100];
   int bp, crc, rlen;
-
+  int tries;
+#define MAXTRIES 5
 
   if (argc <= 1) {
     print_usage (argv[0]);
@@ -1212,8 +1213,11 @@ int main(int argc, char *argv[])
       //if (debug & DEBUG_TRANSFER) dump_buf ("D: m2read: sending: ", tbuf, bp);
       transfer (fd, tbuf, bp, 0);
 
-      usleep (100);
-      tbuf[0] = addr+1;
+      tries = MAXTRIES;
+      do {
+	usleep (100);
+	tbuf[0] = addr+1;
+      } while (tries-- && tbuf[2] == 0xbb);
 
       if ((rlen+6) > 33) printf ("W: Transfer %d > 32 bytes. Target may not support this.\n", rlen+6);
       transfer (fd, tbuf, rlen+6,0);
