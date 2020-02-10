@@ -1213,14 +1213,16 @@ int main(int argc, char *argv[])
       //if (debug & DEBUG_TRANSFER) dump_buf ("D: m2read: sending: ", tbuf, bp);
       transfer (fd, tbuf, bp, 0);
 
-      tries = MAXTRIES;
+      tries = 0;
       do {
 	usleep (100);
 	tbuf[0] = addr+1;
-      } while (tries-- && tbuf[2] == 0xbb);
+	transfer (fd, tbuf, rlen+6,0);
+      } while ((tries++ < MAXTRIES) && (tbuf[2] == 0xbb));
+
+      if (tries != 1) printf ("W: required %d tries.\n", tries);
 
       if ((rlen+6) > 33) printf ("W: Transfer %d > 32 bytes. Target may not support this.\n", rlen+6);
-      transfer (fd, tbuf, rlen+6,0);
 
       //printf ("rlen=%2d  ", rlen);
       // if (debug & DEBUG_TRANSFER) dump_buf ("D: got: ", tbuf, rlen+6);
