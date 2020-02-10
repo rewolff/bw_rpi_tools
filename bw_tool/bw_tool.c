@@ -1026,7 +1026,7 @@ int get_update_tid (void)
   }
   if (fp) fclose (fp);
   
-  fp = fopen (buf, "w");
+  fp = fopen (tidfname, "w");
 #if 1
   if (!fp) {
     fprintf (stderr, "Can't open %s", buf);
