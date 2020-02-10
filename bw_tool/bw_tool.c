@@ -1015,7 +1015,7 @@ char *formatstr (char typech)
 int get_update_tid (void)
 {
   //char *tidp;
-  char buf[32];
+  //char buf[32];
   int ltid;
   FILE *fp;
 
@@ -1029,7 +1029,7 @@ int get_update_tid (void)
   fp = fopen (tidfname, "w");
 #if 1
   if (!fp) {
-    fprintf (stderr, "Can't open %s", buf);
+    fprintf (stderr, "Can't open %s", tidfname);
     perror ("");
     exit (1);
   }
