@@ -504,6 +504,7 @@ unsigned long long get_value (unsigned char *buf, int len)
 #define FLAG_ADDR 1
 #define FLAG_ERR  2
 #define FLAG_DBG  4
+#define FLAG_RETRIES 8
 
 static void do_ident (int fd, int a, int flags)
 {
@@ -1166,9 +1167,17 @@ int main(int argc, char *argv[])
 
       if (bp > 33) printf ("W: Transfer %d > 32 bytes. Target may not support this.\n", bp);
       transfer (fd, tbuf, bp, 0);
-      usleep (100);
-      tbuf[0] = addr + 1;
-      transfer (fd, tbuf, 8, 0);
+
+      tries = 0;
+      do {
+	usleep (100);
+	tbuf[0] = addr+1;
+	transfer (fd, tbuf, 8,0);
+      } while ((tries++ < MAXTRIES) && (tbuf[2] == 0xbb));
+
+      if ((debug & FLAG_RETRIES) && (tries != 1)) 
+	printf ("W: required %d tries.\n", tries);
+
       //if (debug & DEBUG_TRANSFER) dump_buf ("D:       got: ", tbuf, 8);
       if (tbuf[1] != addr) 
 	printf ("E: Didn't return addr: %02x\n", tbuf[1]);
@@ -1220,7 +1229,8 @@ int main(int argc, char *argv[])
 	transfer (fd, tbuf, rlen+6,0);
       } while ((tries++ < MAXTRIES) && (tbuf[2] == 0xbb));
 
-      if (tries != 1) printf ("W: required %d tries.\n", tries);
+      if ((debug & FLAG_RETRIES) && (tries != 1)) 
+	printf ("W: required %d tries.\n", tries);
 
       if ((rlen+6) > 33) printf ("W: Transfer %d > 32 bytes. Target may not support this.\n", rlen+6);
 
