@@ -1143,6 +1143,7 @@ int main(int argc, char *argv[])
 	  tbuf[bp++] = (val >> 40) & 0xff;
 	  tbuf[bp++] = (val >> 48) & 0xff;
 	  tbuf[bp++] = (val >> 56) & 0xff;
+	  break;
 	default:
 	  fprintf (stderr, "Don't understand the type value in %s\n", argv[i]);
 	  exit (1);
