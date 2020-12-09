@@ -1075,7 +1075,7 @@ int main(int argc, char *argv[])
   //fprintf (stderr, "mode = %d\n", mode);
   fd = open(device, O_RDWR);
   if (fd < 0)
-    pabort("can't open device");
+    pabort(device);
 
   init_device (fd);
 
