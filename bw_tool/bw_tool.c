@@ -1020,6 +1020,7 @@ int get_update_tid (void)
   int ltid;
   FILE *fp;
 
+
   fp = fopen (tidfname, "r");
   if (!fp || (fscanf (fp, "%d", &ltid) < 1)) {
     srand (time (NULL));
@@ -1027,6 +1028,8 @@ int get_update_tid (void)
   }
   if (fp) fclose (fp);
   
+  if (!tidfname) return ltid;
+
   fp = fopen (tidfname, "w");
 #if 1
   if (!fp) {
@@ -1061,8 +1064,10 @@ int main(int argc, char *argv[])
     print_usage (argv[0]);
     exit (0);
   }
-  sprintf (tidfnamebuf, "%s/.tid", getenv ("HOME"));
-  tidfname = tidfnamebuf; 
+  if (getenv ("HOME")) {
+    sprintf (tidfnamebuf, "%s/.tid", getenv ("HOME"));
+    tidfname = tidfnamebuf; 
+  } else tidfname = NULL;
 
   nonoptions = parse_opts(argc, argv);
 
