@@ -59,7 +59,8 @@ int main (int argc, char **argv)
     perror ("tcsetattr");
     exit (1);
   }
-  static const int rate = 250000;
+
+  static int rate = 250000;
 
   if (ioctl(uartfd, TCGETS2, &tio) < 0) {
     perror ("tcgets2");
@@ -90,6 +91,6 @@ int main (int argc, char **argv)
        perror ("write");
        exit (1);
     }
-    usleep (25000);
+    usleep (rate);
   }
 }
